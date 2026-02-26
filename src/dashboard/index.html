@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A2A Simulator Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .nav { display: flex; gap: 8px; }
+  .header .nav button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .header .nav button:hover { background: #30363d; }
+  .header .nav button.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .card-header { padding: 12px 16px; border-bottom: 1px solid #30363d; font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .card-body { padding: 16px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; border-bottom: 1px solid #30363d; color: #8b949e; font-weight: 500; }
+  td { padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  tr:hover { background: #1c2128; }
+  tr { cursor: pointer; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .badge-customer_win { background: #238636; color: #fff; }
+  .badge-compromise { background: #9e6a03; color: #fff; }
+  .badge-merchant_win { background: #da3633; color: #fff; }
+  .badge-echoing { background: #8957e5; color: #fff; }
+  .badge-deadlock { background: #6e7681; color: #fff; }
+  .badge-error { background: #f85149; color: #fff; }
+  .badge-pending { background: #30363d; color: #8b949e; }
+
+  .outcome-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 1px; }
+  .outcome-bar div { height: 100%; }
+  .bar-customer_win { background: #238636; }
+  .bar-compromise { background: #9e6a03; }
+  .bar-merchant_win { background: #da3633; }
+  .bar-echoing { background: #8957e5; }
+  .bar-deadlock { background: #6e7681; }
+  .bar-error { background: #f85149; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; text-align: center; }
+  .stat-value { font-size: 24px; font-weight: 700; }
+  .stat-label { font-size: 11px; color: #8b949e; margin-top: 4px; }
+
+  .chat { display: flex; flex-direction: column; gap: 12px; }
+  .chat-msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .chat-msg.customer { align-self: flex-start; background: #1f6feb; color: #fff; border-bottom-left-radius: 4px; }
+  .chat-msg.merchant { align-self: flex-end; background: #21262d; border: 1px solid #30363d; border-bottom-right-radius: 4px; }
+  .chat-label { font-size: 11px; color: #8b949e; margin-bottom: 2px; }
+  .chat-label.customer { align-self: flex-start; }
+  .chat-label.merchant { align-self: flex-end; }
+  .chat-meta { font-size: 10px; color: #6e7681; margin-top: 4px; }
+
+  .breadcrumb { font-size: 13px; color: #8b949e; margin-bottom: 16px; }
+  .breadcrumb span { cursor: pointer; color: #58a6ff; }
+  .breadcrumb span:hover { text-decoration: underline; }
+
+  .echoing-meter { width: 100%; height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; }
+  .echoing-meter-fill { height: 100%; background: linear-gradient(90deg, #238636, #9e6a03, #da3633, #8957e5); border-radius: 3px; }
+
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-bar select { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+
+  .safety-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin: 1px; }
+  .safety-pass { background: #238636; color: #fff; }
+  .safety-fail { background: #da3633; color: #fff; }
+  .safety-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+  .safety-dot.pass { background: #238636; }
+  .safety-dot.fail { background: #da3633; }
+
+  .empty { text-align: center; padding: 48px; color: #8b949e; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>A2A Simulator</h1>
+  <div class="nav">
+    <button class="active" onclick="showBatches()">Batches</button>
+  </div>
+</div>
+
+<div class="container" id="content">
+  <div class="empty">Loading...</div>
+</div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const content = $('#content');
+
+let currentView = 'batches';
+
+async function api(path) {
+  const res = await fetch(path);
+  return res.json();
+}
+
+function badge(outcome) {
+  return `<span class="badge badge-${outcome}">${outcome.replace('_', ' ')}</span>`;
+}
+
+function safetyDot(flags) {
+  if (!flags) return '<span class="safety-dot pass"></span>';
+  const any = flags.injectionSucceeded || flags.dataLeaked || flags.falseClaimAccepted || flags.authorityDeferred;
+  return `<span class="safety-dot ${any ? 'fail' : 'pass'}"></span>`;
+}
+
+function safetyBadges(flags) {
+  if (!flags) return '<span class="safety-badge safety-pass">SAFE</span>';
+  const items = [];
+  if (flags.injectionSucceeded) items.push('<span class="safety-badge safety-fail">injection</span>');
+  if (flags.dataLeaked) items.push('<span class="safety-badge safety-fail">data leak</span>');
+  if (flags.falseClaimAccepted) items.push('<span class="safety-badge safety-fail">false claim</span>');
+  if (flags.authorityDeferred) items.push('<span class="safety-badge safety-fail">authority</span>');
+  if (items.length === 0) return '<span class="safety-badge safety-pass">SAFE</span>';
+  return items.join(' ');
+}
+
+function computeSafetyStats(runs) {
+  let total = 0, injection = 0, dataLeak = 0, falseClaim = 0, authority = 0;
+  for (const r of runs) {
+    if (!r.safetyFlags) continue;
+    total++;
+    if (r.safetyFlags.injectionSucceeded) injection++;
+    if (r.safetyFlags.dataLeaked) dataLeak++;
+    if (r.safetyFlags.falseClaimAccepted) falseClaim++;
+    if (r.safetyFlags.authorityDeferred) authority++;
+  }
+  return { total, injection, dataLeak, falseClaim, authority };
+}
+
+function outcomeBar(outcomes) {
+  if (!outcomes) return '';
+  const total = Object.values(outcomes).reduce((a, b) => a + b, 0);
+  if (total === 0) return '';
+  const parts = Object.entries(outcomes)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => `<div class="bar-${k}" style="width:${(v / total) * 100}%" title="${k}: ${v}"></div>`)
+    .join('');
+  return `<div class="outcome-bar">${parts}</div>`;
+}
+
+async function showBatches() {
+  currentView = 'batches';
+  const batches = await api('/api/batches');
+  if (batches.length === 0) {
+    content.innerHTML = '<div class="empty">No simulation batches yet. Run <code>npm run sim</code> or <code>npm run batch</code> to get started.</div>';
+    return;
+  }
+  content.innerHTML = `
+    <div class="card">
+      <div class="card-header">All Batches</div>
+      <table>
+        <thead><tr><th>Batch ID</th><th>Runs</th><th>Avg Turns</th><th>Echoing Rate</th><th>Outcomes</th></tr></thead>
+        <tbody>
+          ${batches.map(b => `
+            <tr onclick="showBatch('${b.batchId}')">
+              <td>${b.batchId}</td>
+              <td>${b.completedRuns || 0}/${b.totalRuns || 0}</td>
+              <td>${b.averageTurns || '-'}</td>
+              <td>${b.echoingRate != null ? Math.round(b.echoingRate * 100) + '%' : '-'}</td>
+              <td style="width:200px">${outcomeBar(b.outcomes)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function showBatch(batchId) {
+  currentView = 'batch';
+  const data = await api('/api/batches/' + batchId);
+  const { batchSummary, runs } = data;
+
+  let statsHtml = '';
+  if (batchSummary) {
+    const safetyStats = computeSafetyStats(runs);
+    statsHtml = `
+      <div class="stats">
+        <div class="stat"><div class="stat-value">${batchSummary.completedRuns}</div><div class="stat-label">Completed Runs</div></div>
+        <div class="stat"><div class="stat-value">${batchSummary.averageTurns}</div><div class="stat-label">Avg Turns</div></div>
+        <div class="stat"><div class="stat-value">${Math.round(batchSummary.echoingRate * 100)}%</div><div class="stat-label">Echoing Rate</div></div>
+        <div class="stat"><div class="stat-value">${Math.round((batchSummary.averageDurationMs || 0) / 1000)}s</div><div class="stat-label">Avg Duration</div></div>
+      </div>
+      ${safetyStats.total > 0 ? `
+      <div class="stats">
+        <div class="stat"><div class="stat-value" style="color:${safetyStats.injection > 0 ? '#da3633' : '#238636'}">${safetyStats.injection}/${safetyStats.total}</div><div class="stat-label">Injection Success</div></div>
+        <div class="stat"><div class="stat-value" style="color:${safetyStats.dataLeak > 0 ? '#da3633' : '#238636'}">${safetyStats.dataLeak}/${safetyStats.total}</div><div class="stat-label">Data Leaked</div></div>
+        <div class="stat"><div class="stat-value" style="color:${safetyStats.falseClaim > 0 ? '#da3633' : '#238636'}">${safetyStats.falseClaim}/${safetyStats.total}</div><div class="stat-label">False Claim Accepted</div></div>
+        <div class="stat"><div class="stat-value" style="color:${safetyStats.authority > 0 ? '#da3633' : '#238636'}">${safetyStats.authority}/${safetyStats.total}</div><div class="stat-label">Authority Deferred</div></div>
+      </div>` : ''}
+    `;
+  }
+
+  const variations = [...new Set(runs.map(r => r.variationId).filter(Boolean))];
+  const outcomes = [...new Set(runs.map(r => r.outcome).filter(Boolean))];
+
+  content.innerHTML = `
+    <div class="breadcrumb"><span onclick="showBatches()">Batches</span> / ${batchId}</div>
+    ${statsHtml}
+    <div class="card">
+      <div class="card-header">
+        Runs
+        <div class="filter-bar">
+          <select id="filter-variation" onchange="filterRuns()">
+            <option value="">All variations</option>
+            ${variations.map(v => `<option value="${v}">${v}</option>`).join('')}
+          </select>
+          <select id="filter-outcome" onchange="filterRuns()">
+            <option value="">All outcomes</option>
+            ${outcomes.map(o => `<option value="${o}">${o}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Run ID</th><th>Variation</th><th>Turns</th><th>Outcome</th><th>Safety</th><th>Echoing</th><th>Duration</th><th>Summary</th></tr></thead>
+        <tbody id="runs-body">
+          ${runs.map(r => runRow(batchId, r)).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  window._batchId = batchId;
+  window._runs = runs;
+}
+
+function runRow(batchId, r) {
+  return `
+    <tr onclick="showRun('${batchId}', '${r.runId}')" data-variation="${r.variationId || ''}" data-outcome="${r.outcome || ''}">
+      <td>${r.runId}</td>
+      <td>${r.variationId || '-'}</td>
+      <td>${r.totalTurns || '-'}</td>
+      <td>${badge(r.outcome || 'pending')}</td>
+      <td>${safetyDot(r.safetyFlags)}</td>
+      <td>${r.echoingScore != null ? `<div class="echoing-meter"><div class="echoing-meter-fill" style="width:${r.echoingScore * 100}%"></div></div>` : '-'}</td>
+      <td>${r.totalDurationMs ? Math.round(r.totalDurationMs / 1000) + 's' : '-'}</td>
+      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.resolutionSummary || '-'}</td>
+    </tr>
+  `;
+}
+
+function filterRuns() {
+  const variation = document.getElementById('filter-variation').value;
+  const outcome = document.getElementById('filter-outcome').value;
+  const rows = document.querySelectorAll('#runs-body tr');
+  rows.forEach(row => {
+    const matchV = !variation || row.dataset.variation === variation;
+    const matchO = !outcome || row.dataset.outcome === outcome;
+    row.style.display = (matchV && matchO) ? '' : 'none';
+  });
+}
+
+async function showRun(batchId, runId) {
+  currentView = 'run';
+  const data = await api(`/api/runs/${batchId}/${runId}`);
+  const { metadata, summary, conversation } = data;
+
+  const chatHtml = conversation.map(turn => `
+    <div class="chat-label ${turn.role}">${turn.role === 'customer' ? "Customer's Agent" : "Merchant's Agent"} &middot; Turn ${turn.turnNumber}</div>
+    <div class="chat-msg ${turn.role}">
+      ${escapeHtml(turn.message)}
+      <div class="chat-meta">${turn.durationMs ? Math.round(turn.durationMs / 1000) + 's' : ''}</div>
+    </div>
+  `).join('');
+
+  content.innerHTML = `
+    <div class="breadcrumb">
+      <span onclick="showBatches()">Batches</span> /
+      <span onclick="showBatch('${batchId}')">${batchId}</span> /
+      ${runId}
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-value">${badge(summary?.outcome || 'pending')}</div><div class="stat-label">Outcome</div></div>
+      <div class="stat"><div class="stat-value">${summary?.totalTurns || '-'}</div><div class="stat-label">Turns</div></div>
+      <div class="stat">
+        <div class="stat-value">${summary?.echoingScore != null ? (summary.echoingScore * 100).toFixed(0) + '%' : '-'}</div>
+        <div class="stat-label">Echoing Score</div>
+      </div>
+      <div class="stat"><div class="stat-value">${summary?.totalDurationMs ? Math.round(summary.totalDurationMs / 1000) + 's' : '-'}</div><div class="stat-label">Duration</div></div>
+    </div>
+    ${summary?.safetyFlags ? `<div class="card"><div class="card-header">Safety Flags</div><div class="card-body">${safetyBadges(summary.safetyFlags)}</div></div>` : ''}
+    ${summary?.resolutionSummary ? `<div class="card"><div class="card-body">${escapeHtml(summary.resolutionSummary)}</div></div>` : ''}
+    <div class="card">
+      <div class="card-header">Conversation (${metadata?.variationId || 'unknown'} variation)</div>
+      <div class="card-body">
+        <div class="chat">${chatHtml}</div>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+showBatches();
+</script>
+</body>
+</html>
