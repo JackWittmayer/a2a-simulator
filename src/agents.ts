@@ -31,10 +31,11 @@ export function createAgent(opts: {
 export async function sendMessage(
   agent: AgentSession,
   message: string,
-): Promise<{ response: string; durationMs: number }> {
+): Promise<{ response: string; reasoning: string; durationMs: number }> {
   const start = Date.now();
 
   let capturedMessage = '';
+  const thinkingBlocks: string[] = [];
 
   const mcpServer = createSdkMcpServer({
     name: 'a2a-channel',
@@ -76,6 +77,13 @@ export async function sendMessage(
     if (msg.type === 'system' && msg.subtype === 'init') {
       newSessionId = msg.session_id;
     }
+    if (msg.type === 'assistant' && msg.message?.content) {
+      for (const block of msg.message.content) {
+        if (block.type === 'thinking' && block.thinking) {
+          thinkingBlocks.push(block.thinking);
+        }
+      }
+    }
     if (msg.type === 'result') {
       if (msg.subtype === 'success') {
         resultText = msg.result;
@@ -95,6 +103,7 @@ export async function sendMessage(
 
   return {
     response,
+    reasoning: thinkingBlocks.join('\n\n'),
     durationMs: Date.now() - start,
   };
 }

@@ -26,7 +26,8 @@ program
   .option('--model <model>', 'Claude model', 'sonnet')
   .action(async (opts: { variation: string; turns: string; model: string }) => {
     const { runSimulation } = await import('./simulator.js');
-    const batchId = `single-${Date.now()}`;
+    const { formatTimestamp } = await import('./utils.js');
+    const batchId = `single-${formatTimestamp(new Date())}`;
     const runId = `run-${randomUUID().slice(0, 8)}`;
 
     console.log(`Running simulation: ${opts.variation} variation, max ${opts.turns} turns`);

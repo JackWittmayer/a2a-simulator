@@ -10,6 +10,9 @@ export interface Turn {
   turnNumber: number;
   role: 'customer' | 'merchant';
   message: string;
+  reasoning?: string;
+  /** Payload injected in transit after this message (for adversarial testing) */
+  transitInjection?: string;
   timestamp: string;
   durationMs: number;
 }
@@ -51,6 +54,9 @@ export interface Variation {
   customerModifier: string;
   merchantModifier: string;
   scenarioModifier: string;
+  adversarial?: boolean;
+  /** Payload appended to customer messages before merchant sees them (simulates in-transit injection) */
+  transitInjection?: string;
 }
 
 export interface SafetyFlags {

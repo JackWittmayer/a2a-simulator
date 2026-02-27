@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
 <title>A2A Simulator Dashboard</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -53,7 +54,21 @@
   .stat-label { font-size: 11px; color: #8b949e; margin-top: 4px; }
 
   .chat { display: flex; flex-direction: column; gap: 12px; }
-  .chat-msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .chat-msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+  .chat-msg p { margin: 0 0 8px 0; }
+  .chat-msg p:last-of-type { margin-bottom: 0; }
+  .chat-msg ul, .chat-msg ol { margin: 4px 0 8px 20px; }
+  .chat-msg li { margin-bottom: 2px; }
+  .chat-msg code { background: rgba(0,0,0,0.2); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .chat-msg pre { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+  .chat-msg pre code { background: none; padding: 0; }
+  .chat-msg h1, .chat-msg h2, .chat-msg h3, .chat-msg h4 { margin: 8px 0 4px 0; font-size: 13px; }
+  .chat-msg h1 { font-size: 16px; }
+  .chat-msg h2 { font-size: 15px; }
+  .chat-msg h3 { font-size: 14px; }
+  .chat-msg blockquote { border-left: 3px solid rgba(255,255,255,0.3); margin: 4px 0; padding: 2px 8px; opacity: 0.85; }
+  .chat-msg table { margin: 6px 0; }
+  .chat-msg strong { font-weight: 600; }
   .chat-msg.customer { align-self: flex-start; background: #1f6feb; color: #fff; border-bottom-left-radius: 4px; }
   .chat-msg.merchant { align-self: flex-end; background: #21262d; border: 1px solid #30363d; border-bottom-right-radius: 4px; }
   .chat-label { font-size: 11px; color: #8b949e; margin-bottom: 2px; }
@@ -79,6 +94,17 @@
   .safety-dot.fail { background: #da3633; }
 
   .empty { text-align: center; padding: 48px; color: #8b949e; }
+
+  .reasoning { max-width: 75%; cursor: pointer; margin-bottom: 2px; }
+  .reasoning .reasoning-header { font-size: 11px; color: #8b949e; padding: 4px 8px; background: #1c1c2e; border: 1px solid #30363d; border-radius: 6px; display: inline-block; }
+  .reasoning .reasoning-body { display: none; font-size: 12px; color: #a5a5c0; background: #13131f; border: 1px solid #30363d; border-radius: 6px; padding: 10px 12px; margin-top: 4px; white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow-y: auto; }
+  .reasoning.open .reasoning-body { display: block; }
+  .reasoning.open .reasoning-header { background: #2d2d4e; }
+  .reasoning.customer { align-self: flex-start; }
+  .reasoning.merchant { align-self: flex-end; }
+
+  .injection-block { margin-top: 10px; padding: 8px 10px; background: rgba(218, 54, 51, 0.15); border-left: 3px solid #da3633; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }
+  .injection-label { font-size: 10px; font-weight: 600; color: #da3633; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -99,6 +125,26 @@ const $ = (sel) => document.querySelector(sel);
 const content = $('#content');
 
 let currentView = 'batches';
+
+function navigate(hash, replace = false) {
+  if (replace) {
+    history.replaceState(null, '', hash);
+  } else {
+    history.pushState(null, '', hash);
+  }
+  routeFromHash();
+}
+
+function routeFromHash() {
+  const hash = location.hash || '#';
+  const runMatch = hash.match(/^#\/batch\/([^/]+)\/run\/([^/]+)$/);
+  if (runMatch) { showRun(runMatch[1], runMatch[2], true); return; }
+  const batchMatch = hash.match(/^#\/batch\/([^/]+)$/);
+  if (batchMatch) { showBatch(batchMatch[1], true); return; }
+  showBatches(true);
+}
+
+window.addEventListener('popstate', () => routeFromHash());
 
 async function api(path) {
   const res = await fetch(path);
@@ -150,22 +196,70 @@ function outcomeBar(outcomes) {
   return `<div class="outcome-bar">${parts}</div>`;
 }
 
-async function showBatches() {
+function parseBatchTimestamp(batchId) {
+  // New format: batch-2026-02-26_13h45m12s or single-2026-02-26_13h45m12s
+  const m = batchId.match(/^(?:batch|single)-(\d{4})-(\d{2})-(\d{2})_(\d{2})h(\d{2})m(\d{2})s$/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+  // Legacy format: batch-1772141574807 or single-1772140744391
+  const ml = batchId.match(/^(?:batch|single)-(\d{10,})$/);
+  if (ml) return new Date(+ml[1]);
+  return null;
+}
+
+function formatBatchDisplay(batchId) {
+  const ts = parseBatchTimestamp(batchId);
+  if (!ts || isNaN(ts.getTime())) return batchId;
+  const prefix = batchId.startsWith('single') ? 'Single' : 'Batch';
+  return `${prefix} @ ${ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+}
+
+function groupKey(batchId) {
+  const ts = parseBatchTimestamp(batchId);
+  if (!ts || isNaN(ts.getTime())) return 'Unknown';
+  return `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}_${String(ts.getHours()).padStart(2,'0')}`;
+}
+
+function formatGroupHeader(key) {
+  if (key === 'Unknown') return 'Unknown Date';
+  const m = key.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})$/);
+  if (!m) return key;
+  const date = new Date(+m[1], +m[2] - 1, +m[3], +m[4]);
+  const dayStr = date.toLocaleDateString([], { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' });
+  const hour = date.getHours();
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h12 = hour % 12 || 12;
+  return `${dayStr} at ${h12} ${ampm}`;
+}
+
+async function showBatches(fromRoute = false) {
+  if (!fromRoute) { navigate('#'); return; }
   currentView = 'batches';
   const batches = await api('/api/batches');
   if (batches.length === 0) {
     content.innerHTML = '<div class="empty">No simulation batches yet. Run <code>npm run sim</code> or <code>npm run batch</code> to get started.</div>';
     return;
   }
-  content.innerHTML = `
-    <div class="card">
-      <div class="card-header">All Batches</div>
+
+  // Group batches by date + hour
+  const groups = {};
+  for (const b of batches) {
+    const key = groupKey(b.batchId);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(b);
+  }
+
+  // Sort group keys descending (newest first)
+  const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+  content.innerHTML = sortedKeys.map(key => `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">${formatGroupHeader(key)}</div>
       <table>
-        <thead><tr><th>Batch ID</th><th>Runs</th><th>Avg Turns</th><th>Echoing Rate</th><th>Outcomes</th></tr></thead>
+        <thead><tr><th>Batch</th><th>Runs</th><th>Avg Turns</th><th>Echoing Rate</th><th>Outcomes</th></tr></thead>
         <tbody>
-          ${batches.map(b => `
+          ${groups[key].map(b => `
             <tr onclick="showBatch('${b.batchId}')">
-              <td>${b.batchId}</td>
+              <td>${formatBatchDisplay(b.batchId)}</td>
               <td>${b.completedRuns || 0}/${b.totalRuns || 0}</td>
               <td>${b.averageTurns || '-'}</td>
               <td>${b.echoingRate != null ? Math.round(b.echoingRate * 100) + '%' : '-'}</td>
@@ -175,10 +269,11 @@ async function showBatches() {
         </tbody>
       </table>
     </div>
-  `;
+  `).join('');
 }
 
-async function showBatch(batchId) {
+async function showBatch(batchId, fromRoute = false) {
+  if (!fromRoute) { navigate('#/batch/' + batchId); return; }
   currentView = 'batch';
   const data = await api('/api/batches/' + batchId);
   const { batchSummary, runs } = data;
@@ -207,7 +302,7 @@ async function showBatch(batchId) {
   const outcomes = [...new Set(runs.map(r => r.outcome).filter(Boolean))];
 
   content.innerHTML = `
-    <div class="breadcrumb"><span onclick="showBatches()">Batches</span> / ${batchId}</div>
+    <div class="breadcrumb"><span onclick="showBatches()">Batches</span> / ${formatBatchDisplay(batchId)}</div>
     ${statsHtml}
     <div class="card">
       <div class="card-header">
@@ -262,15 +357,23 @@ function filterRuns() {
   });
 }
 
-async function showRun(batchId, runId) {
+async function showRun(batchId, runId, fromRoute = false) {
+  if (!fromRoute) { navigate(`#/batch/${batchId}/run/${runId}`); return; }
   currentView = 'run';
   const data = await api(`/api/runs/${batchId}/${runId}`);
-  const { metadata, summary, conversation } = data;
+  const { metadata, summary, conversation, variation } = data;
+
+  lastConversationLength = conversation.length;
 
   const chatHtml = conversation.map(turn => `
     <div class="chat-label ${turn.role}">${turn.role === 'customer' ? "Customer's Agent" : "Merchant's Agent"} &middot; Turn ${turn.turnNumber}</div>
+    ${turn.reasoning ? `<div class="reasoning ${turn.role}" onclick="this.classList.toggle('open')">
+      <div class="reasoning-header">Reasoning (click to expand)</div>
+      <div class="reasoning-body">${escapeHtml(turn.reasoning)}</div>
+    </div>` : ''}
     <div class="chat-msg ${turn.role}">
-      ${escapeHtml(turn.message)}
+      ${renderMarkdown(turn.message)}
+      ${turn.transitInjection ? `<div class="injection-block"><div class="injection-label">Transit Injection</div>${escapeHtml(turn.transitInjection)}</div>` : ''}
       <div class="chat-meta">${turn.durationMs ? Math.round(turn.durationMs / 1000) + 's' : ''}</div>
     </div>
   `).join('');
@@ -278,7 +381,7 @@ async function showRun(batchId, runId) {
   content.innerHTML = `
     <div class="breadcrumb">
       <span onclick="showBatches()">Batches</span> /
-      <span onclick="showBatch('${batchId}')">${batchId}</span> /
+      <span onclick="showBatch('${batchId}')">${formatBatchDisplay(batchId)}</span> /
       ${runId}
     </div>
     <div class="stats">
@@ -290,6 +393,12 @@ async function showRun(batchId, runId) {
       </div>
       <div class="stat"><div class="stat-value">${summary?.totalDurationMs ? Math.round(summary.totalDurationMs / 1000) + 's' : '-'}</div><div class="stat-label">Duration</div></div>
     </div>
+    ${variation ? `<div class="card"><div class="card-header">Variation: ${escapeHtml(variation.id)}</div><div class="card-body">
+      <div style="margin-bottom:6px;color:#bbb">${escapeHtml(variation.description)}${variation.adversarial ? ' <span class="badge" style="background:#e74c3c;margin-left:6px">adversarial</span>' : ''}</div>
+      ${variation.customerModifier ? `<div style="margin-bottom:4px"><strong style="color:#6ea8fe">Customer modifier:</strong> <span style="color:#aaa">${escapeHtml(variation.customerModifier.trim())}</span></div>` : ''}
+      ${variation.merchantModifier ? `<div style="margin-bottom:4px"><strong style="color:#adb5bd">Merchant modifier:</strong> <span style="color:#aaa">${escapeHtml(variation.merchantModifier.trim())}</span></div>` : ''}
+      ${variation.scenarioModifier ? `<div><strong style="color:#f0ad4e">Scenario modifier:</strong> <span style="color:#aaa">${escapeHtml(variation.scenarioModifier.trim())}</span></div>` : ''}
+    </div></div>` : ''}
     ${summary?.safetyFlags ? `<div class="card"><div class="card-header">Safety Flags</div><div class="card-body">${safetyBadges(summary.safetyFlags)}</div></div>` : ''}
     ${summary?.resolutionSummary ? `<div class="card"><div class="card-body">${escapeHtml(summary.resolutionSummary)}</div></div>` : ''}
     <div class="card">
@@ -306,7 +415,72 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-showBatches();
+function renderMarkdown(str) {
+  if (!str) return '';
+  return marked.parse(str);
+}
+
+// Auto-refresh polling
+let refreshTimer = null;
+let lastConversationLength = 0;
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshTimer = setInterval(autoRefresh, 2000);
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+async function autoRefresh() {
+  if (currentView === 'run') {
+    const hash = location.hash || '#';
+    const m = hash.match(/^#\/batch\/([^/]+)\/run\/([^/]+)$/);
+    if (!m) return;
+    const data = await api(`/api/runs/${m[1]}/${m[2]}`);
+    const { conversation, summary } = data;
+    if (conversation.length > lastConversationLength) {
+      const chatEl = document.querySelector('.chat');
+      if (!chatEl) return;
+      const newTurns = conversation.slice(lastConversationLength);
+      for (const turn of newTurns) {
+        chatEl.insertAdjacentHTML('beforeend', `
+          <div class="chat-label ${turn.role}">${turn.role === 'customer' ? "Customer's Agent" : "Merchant's Agent"} &middot; Turn ${turn.turnNumber}</div>
+          ${turn.reasoning ? `<div class="reasoning ${turn.role}" onclick="this.classList.toggle('open')">
+            <div class="reasoning-header">Reasoning (click to expand)</div>
+            <div class="reasoning-body">${escapeHtml(turn.reasoning)}</div>
+          </div>` : ''}
+          <div class="chat-msg ${turn.role}">
+            ${renderMarkdown(turn.message)}
+            ${turn.transitInjection ? `<div class="injection-block"><div class="injection-label">Transit Injection</div>${escapeHtml(turn.transitInjection)}</div>` : ''}
+            <div class="chat-meta">${turn.durationMs ? Math.round(turn.durationMs / 1000) + 's' : ''}</div>
+          </div>
+        `);
+      }
+      lastConversationLength = conversation.length;
+      chatEl.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
+    }
+    // Update stats if summary appeared/changed
+    if (summary) {
+      const outcomeEl = document.querySelector('.stats .stat:first-child .stat-value');
+      if (outcomeEl) outcomeEl.innerHTML = badge(summary.outcome || 'pending');
+      const turnsEl = document.querySelector('.stats .stat:nth-child(2) .stat-value');
+      if (turnsEl) turnsEl.textContent = summary.totalTurns || '-';
+    }
+  } else if (currentView === 'batches') {
+    showBatches(true);
+  } else if (currentView === 'batch') {
+    const hash = location.hash || '#';
+    const m = hash.match(/^#\/batch\/([^/]+)$/);
+    if (m) showBatch(m[1], true);
+  }
+}
+
+// Initialize: route based on current hash (or default to batches)
+if (!location.hash) history.replaceState(null, '', '#');
+routeFromHash();
+startAutoRefresh();
 </script>
 </body>
 </html>

@@ -3,6 +3,12 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getLogsDir } from '../logger.js';
 import type { RunSummary, BatchSummary } from '../types.js';
+import type { Variation } from '../types.js';
+
+function loadVariations(): Variation[] {
+  const variationsPath = join(import.meta.dirname, '..', 'prompts', 'variations.json');
+  return JSON.parse(readFileSync(variationsPath, 'utf-8'));
+}
 
 export function startDashboard(port: number): void {
   const app = express();
@@ -26,9 +32,13 @@ export function startDashboard(port: number): void {
         if (existsSync(summaryPath)) {
           return JSON.parse(readFileSync(summaryPath, 'utf-8')) as BatchSummary;
         }
-        const runDirs = readdirSync(join(logsDir, e.name), { withFileTypes: true })
+        const batchPath = join(logsDir, e.name);
+        const runDirs = readdirSync(batchPath, { withFileTypes: true })
           .filter(d => d.isDirectory() && d.name.startsWith('run-'));
-        return { batchId: e.name, totalRuns: runDirs.length, completedRuns: 0 };
+        const completedRuns = runDirs.filter(d =>
+          existsSync(join(batchPath, d.name, 'summary.json'))
+        ).length;
+        return { batchId: e.name, totalRuns: runDirs.length, completedRuns };
       })
       .sort((a, b) => b.batchId.localeCompare(a.batchId));
     res.json(batches);
@@ -85,7 +95,12 @@ export function startDashboard(port: number): void {
           .map(line => JSON.parse(line))
       : [];
 
-    res.json({ metadata, summary, conversation });
+    const variations = loadVariations();
+    const variation = metadata?.variationId
+      ? variations.find((v: Variation) => v.id === metadata.variationId) || null
+      : null;
+
+    res.json({ metadata, summary, conversation, variation });
   });
 
   app.listen(port, () => {
