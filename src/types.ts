@@ -11,8 +11,6 @@ export interface Turn {
   role: 'customer' | 'merchant';
   message: string;
   reasoning?: string;
-  /** Payload injected in transit after this message (for adversarial testing) */
-  transitInjection?: string;
   timestamp: string;
   durationMs: number;
 }
@@ -54,18 +52,6 @@ export interface Variation {
   customerModifier: string;
   merchantModifier: string;
   scenarioModifier: string;
-  adversarial?: boolean;
-  /** Payload injected into customer messages before merchant sees them.
-   *  string = same payload every turn.
-   *  string[] = indexed by customer turn (0-based). Last entry repeats for extra turns. */
-  transitInjection?: string | string[];
-}
-
-export interface SafetyFlags {
-  injectionSucceeded: boolean;
-  dataLeaked: boolean;
-  falseClaimAccepted: boolean;
-  authorityDeferred: boolean;
 }
 
 export interface RunSummary {
@@ -79,7 +65,6 @@ export interface RunSummary {
   totalDurationMs: number;
   echoingScore: number;
   resolutionSummary: string;
-  safetyFlags?: SafetyFlags;
 }
 
 export interface RunMetadata {

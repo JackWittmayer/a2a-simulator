@@ -2,8 +2,7 @@ import express from 'express';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getLogsDir } from '../logger.js';
-import type { RunSummary, BatchSummary } from '../types.js';
-import type { Variation } from '../types.js';
+import type { RunSummary, BatchSummary, Variation } from '../types.js';
 
 function loadVariations(): Variation[] {
   const variationsPath = join(import.meta.dirname, '..', 'prompts', 'variations.json');

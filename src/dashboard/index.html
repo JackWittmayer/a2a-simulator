@@ -86,13 +86,6 @@
   .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .filter-bar select { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
 
-  .safety-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin: 1px; }
-  .safety-pass { background: #238636; color: #fff; }
-  .safety-fail { background: #da3633; color: #fff; }
-  .safety-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-  .safety-dot.pass { background: #238636; }
-  .safety-dot.fail { background: #da3633; }
-
   .empty { text-align: center; padding: 48px; color: #8b949e; }
 
   .reasoning { max-width: 75%; cursor: pointer; margin-bottom: 2px; }
@@ -103,8 +96,7 @@
   .reasoning.customer { align-self: flex-start; }
   .reasoning.merchant { align-self: flex-end; }
 
-  .injection-block { margin-top: 10px; padding: 8px 10px; background: rgba(218, 54, 51, 0.15); border-left: 3px solid #da3633; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }
-  .injection-label { font-size: 10px; font-weight: 600; color: #da3633; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+
 </style>
 </head>
 <body>
@@ -153,36 +145,6 @@ async function api(path) {
 
 function badge(outcome) {
   return `<span class="badge badge-${outcome}">${outcome.replace('_', ' ')}</span>`;
-}
-
-function safetyDot(flags) {
-  if (!flags) return '<span class="safety-dot pass"></span>';
-  const any = flags.injectionSucceeded || flags.dataLeaked || flags.falseClaimAccepted || flags.authorityDeferred;
-  return `<span class="safety-dot ${any ? 'fail' : 'pass'}"></span>`;
-}
-
-function safetyBadges(flags) {
-  if (!flags) return '<span class="safety-badge safety-pass">SAFE</span>';
-  const items = [];
-  if (flags.injectionSucceeded) items.push('<span class="safety-badge safety-fail">injection</span>');
-  if (flags.dataLeaked) items.push('<span class="safety-badge safety-fail">data leak</span>');
-  if (flags.falseClaimAccepted) items.push('<span class="safety-badge safety-fail">false claim</span>');
-  if (flags.authorityDeferred) items.push('<span class="safety-badge safety-fail">authority</span>');
-  if (items.length === 0) return '<span class="safety-badge safety-pass">SAFE</span>';
-  return items.join(' ');
-}
-
-function computeSafetyStats(runs) {
-  let total = 0, injection = 0, dataLeak = 0, falseClaim = 0, authority = 0;
-  for (const r of runs) {
-    if (!r.safetyFlags) continue;
-    total++;
-    if (r.safetyFlags.injectionSucceeded) injection++;
-    if (r.safetyFlags.dataLeaked) dataLeak++;
-    if (r.safetyFlags.falseClaimAccepted) falseClaim++;
-    if (r.safetyFlags.authorityDeferred) authority++;
-  }
-  return { total, injection, dataLeak, falseClaim, authority };
 }
 
 function outcomeBar(outcomes) {
@@ -280,7 +242,6 @@ async function showBatch(batchId, fromRoute = false) {
 
   let statsHtml = '';
   if (batchSummary) {
-    const safetyStats = computeSafetyStats(runs);
     statsHtml = `
       <div class="stats">
         <div class="stat"><div class="stat-value">${batchSummary.completedRuns}</div><div class="stat-label">Completed Runs</div></div>
@@ -288,13 +249,6 @@ async function showBatch(batchId, fromRoute = false) {
         <div class="stat"><div class="stat-value">${Math.round(batchSummary.echoingRate * 100)}%</div><div class="stat-label">Echoing Rate</div></div>
         <div class="stat"><div class="stat-value">${Math.round((batchSummary.averageDurationMs || 0) / 1000)}s</div><div class="stat-label">Avg Duration</div></div>
       </div>
-      ${safetyStats.total > 0 ? `
-      <div class="stats">
-        <div class="stat"><div class="stat-value" style="color:${safetyStats.injection > 0 ? '#da3633' : '#238636'}">${safetyStats.injection}/${safetyStats.total}</div><div class="stat-label">Injection Success</div></div>
-        <div class="stat"><div class="stat-value" style="color:${safetyStats.dataLeak > 0 ? '#da3633' : '#238636'}">${safetyStats.dataLeak}/${safetyStats.total}</div><div class="stat-label">Data Leaked</div></div>
-        <div class="stat"><div class="stat-value" style="color:${safetyStats.falseClaim > 0 ? '#da3633' : '#238636'}">${safetyStats.falseClaim}/${safetyStats.total}</div><div class="stat-label">False Claim Accepted</div></div>
-        <div class="stat"><div class="stat-value" style="color:${safetyStats.authority > 0 ? '#da3633' : '#238636'}">${safetyStats.authority}/${safetyStats.total}</div><div class="stat-label">Authority Deferred</div></div>
-      </div>` : ''}
     `;
   }
 
@@ -319,7 +273,7 @@ async function showBatch(batchId, fromRoute = false) {
         </div>
       </div>
       <table>
-        <thead><tr><th>Run ID</th><th>Variation</th><th>Turns</th><th>Outcome</th><th>Safety</th><th>Echoing</th><th>Duration</th><th>Summary</th></tr></thead>
+        <thead><tr><th>Run ID</th><th>Variation</th><th>Turns</th><th>Outcome</th><th>Echoing</th><th>Duration</th><th>Summary</th></tr></thead>
         <tbody id="runs-body">
           ${runs.map(r => runRow(batchId, r)).join('')}
         </tbody>
@@ -338,7 +292,6 @@ function runRow(batchId, r) {
       <td>${r.variationId || '-'}</td>
       <td>${r.totalTurns || '-'}</td>
       <td>${badge(r.outcome || 'pending')}</td>
-      <td>${safetyDot(r.safetyFlags)}</td>
       <td>${r.echoingScore != null ? `<div class="echoing-meter"><div class="echoing-meter-fill" style="width:${r.echoingScore * 100}%"></div></div>` : '-'}</td>
       <td>${r.totalDurationMs ? Math.round(r.totalDurationMs / 1000) + 's' : '-'}</td>
       <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.resolutionSummary || '-'}</td>
@@ -373,7 +326,6 @@ async function showRun(batchId, runId, fromRoute = false) {
     </div>` : ''}
     <div class="chat-msg ${turn.role}">
       ${renderMarkdown(turn.message)}
-      ${turn.transitInjection ? `<div class="injection-block"><div class="injection-label">Transit Injection</div>${escapeHtml(turn.transitInjection)}</div>` : ''}
       <div class="chat-meta">${turn.durationMs ? Math.round(turn.durationMs / 1000) + 's' : ''}</div>
     </div>
   `).join('');
@@ -394,12 +346,11 @@ async function showRun(batchId, runId, fromRoute = false) {
       <div class="stat"><div class="stat-value">${summary?.totalDurationMs ? Math.round(summary.totalDurationMs / 1000) + 's' : '-'}</div><div class="stat-label">Duration</div></div>
     </div>
     ${variation ? `<div class="card"><div class="card-header">Variation: ${escapeHtml(variation.id)}</div><div class="card-body">
-      <div style="margin-bottom:6px;color:#bbb">${escapeHtml(variation.description)}${variation.adversarial ? ' <span class="badge" style="background:#e74c3c;margin-left:6px">adversarial</span>' : ''}</div>
+      <div style="margin-bottom:6px;color:#bbb">${escapeHtml(variation.description)}</div>
       ${variation.customerModifier ? `<div style="margin-bottom:4px"><strong style="color:#6ea8fe">Customer modifier:</strong> <span style="color:#aaa">${escapeHtml(variation.customerModifier.trim())}</span></div>` : ''}
       ${variation.merchantModifier ? `<div style="margin-bottom:4px"><strong style="color:#adb5bd">Merchant modifier:</strong> <span style="color:#aaa">${escapeHtml(variation.merchantModifier.trim())}</span></div>` : ''}
       ${variation.scenarioModifier ? `<div><strong style="color:#f0ad4e">Scenario modifier:</strong> <span style="color:#aaa">${escapeHtml(variation.scenarioModifier.trim())}</span></div>` : ''}
     </div></div>` : ''}
-    ${summary?.safetyFlags ? `<div class="card"><div class="card-header">Safety Flags</div><div class="card-body">${safetyBadges(summary.safetyFlags)}</div></div>` : ''}
     ${summary?.resolutionSummary ? `<div class="card"><div class="card-body">${escapeHtml(summary.resolutionSummary)}</div></div>` : ''}
     <div class="card">
       <div class="card-header">Conversation (${metadata?.variationId || 'unknown'} variation)</div>
