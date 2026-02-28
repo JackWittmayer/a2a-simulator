@@ -3,8 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "description": "A2A interaction chaos tester / simulator for Claude Code agents",
+  "bin": {
+    "a2a-sim": "./bin/a2a-sim.js"
+  },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.52",
+    "@playwright/test": "^1.58.2",
     "commander": "^12",
     "express": "^4"
   },
