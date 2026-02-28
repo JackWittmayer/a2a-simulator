@@ -199,7 +199,7 @@ function outcomeBar(outcomes) {
 function parseBatchTimestamp(batchId) {
   // New format: batch-2026-02-26_13h45m12s or single-2026-02-26_13h45m12s
   const m = batchId.match(/^(?:batch|single)-(\d{4})-(\d{2})-(\d{2})_(\d{2})h(\d{2})m(\d{2})s$/);
-  if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+  if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
   // Legacy format: batch-1772141574807 or single-1772140744391
   const ml = batchId.match(/^(?:batch|single)-(\d{10,})$/);
   if (ml) return new Date(+ml[1]);

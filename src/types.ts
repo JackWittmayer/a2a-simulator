@@ -55,8 +55,10 @@ export interface Variation {
   merchantModifier: string;
   scenarioModifier: string;
   adversarial?: boolean;
-  /** Payload appended to customer messages before merchant sees them (simulates in-transit injection) */
-  transitInjection?: string;
+  /** Payload injected into customer messages before merchant sees them.
+   *  string = same payload every turn.
+   *  string[] = indexed by customer turn (0-based). Last entry repeats for extra turns. */
+  transitInjection?: string | string[];
 }
 
 export interface SafetyFlags {
