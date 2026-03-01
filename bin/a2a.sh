@@ -17,9 +17,6 @@ usage() {
   echo "  logs [agent]            Tail logs from all agents or a specific one"
   echo "  status                  Show running agents and message counts"
   echo ""
-  echo "Options:"
-  echo "  -p, --port PORT         Server port (default: 3000)"
-  echo ""
   echo "Examples:"
   echo "  a2a start examples/alice.yaml examples/bob.yaml"
   echo "  a2a stop"
@@ -41,15 +38,11 @@ cmd_start() {
 cmd_stop() {
   echo "Stopping all a2a agent containers..."
   local containers
-  containers=$(docker ps --filter "label=a2a-simulator" -q 2>/dev/null || true)
-  if [ -z "$containers" ]; then
-    # Fallback: stop containers matching known agent names
-    containers=$(docker ps --format '{{.Names}}' 2>/dev/null | while read -r name; do
-      if docker inspect "$name" --format '{{.Config.Env}}' 2>/dev/null | grep -q 'AGENT_NAME='; then
-        echo "$name"
-      fi
-    done || true)
-  fi
+  containers=$(docker ps --format '{{.Names}}' 2>/dev/null | while read -r name; do
+    if docker inspect "$name" --format '{{.Config.Env}}' 2>/dev/null | grep -q 'AGENT_NAME='; then
+      echo "$name"
+    fi
+  done || true)
   if [ -z "$containers" ]; then
     echo "No agent containers found."
     return
@@ -63,7 +56,6 @@ cmd_logs() {
   if [ $# -gt 0 ]; then
     docker logs -f "$1"
   else
-    # Tail all agent containers
     local names
     names=$(docker ps --format '{{.Names}}' 2>/dev/null | while read -r name; do
       if docker inspect "$name" --format '{{.Config.Env}}' 2>/dev/null | grep -q 'AGENT_NAME='; then
