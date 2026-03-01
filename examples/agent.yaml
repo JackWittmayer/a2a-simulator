@@ -56,4 +56,4 @@ container:
     - 3000
   env:
     NODE_ENV: production
-  entrypoint: ["claude", "--print", "Describe the files and directories in your workspace, including the .claude directory"]
+  entrypoint: ["claude", "--print", "--dangerously-skip-permissions", "Describe the files and directories in your workspace, including the .claude directory"]

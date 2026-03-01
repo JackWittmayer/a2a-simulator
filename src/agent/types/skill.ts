@@ -15,5 +15,11 @@ export class Skill {
     fs.mkdirSync(skillDir, { recursive: true });
     const frontmatter = `---\nname: ${this.name}\ndescription: ${this.description}\n---\n\n`;
     fs.writeFileSync(path.join(skillDir, "SKILL.md"), frontmatter + this.skillMd);
+
+    if (this.files) {
+      for (const file of this.files) {
+        fs.writeFileSync(path.join(skillDir, file.name), file.content);
+      }
+    }
   }
 }

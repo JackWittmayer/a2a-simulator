@@ -1,11 +1,41 @@
 import { execSync } from "node:child_process";
-import { Agent } from "../types/agent";
+import * as os from "node:os";
+import * as path from "node:path";
+import { Agent } from "../agent/types/agent";
+
+function expandHome(filePath: string): string {
+  if (filePath.startsWith("~/")) {
+    return path.join(os.homedir(), filePath.slice(2));
+  }
+  return filePath;
+}
 
 export function launchAgent(agent: Agent): string {
-  const args: string[] = ["docker", "run", "-d", "--name", agent.name];
+  // Remove any stale container with the same name
+  try {
+    execSync(`docker rm -f ${agent.name}`, { stdio: "ignore" });
+  } catch {
+    // no existing container, that's fine
+  }
+
+  const args: string[] = [
+    "docker", "run", "-d",
+    "--name", agent.name,
+    "--add-host=host.docker.internal:host-gateway",
+  ];
+
+  // Run as host user so mounted credential files are readable
+  // and Claude CLI allows --dangerously-skip-permissions (requires non-root)
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
+  if (uid !== undefined && gid !== undefined) {
+    args.push("-u", `${uid}:${gid}`);
+  }
+
+  args.push("-e", "HOME=/workspace");
 
   if (agent.model.credentialsFile) {
-    args.push("-v", `${agent.model.credentialsFile}:/workspace/.claude/.credentials.json:ro`);
+    args.push("-v", `${expandHome(agent.model.credentialsFile)}:/workspace/.claude/.credentials.json:ro`);
   } else if (agent.model.apiKey) {
     args.push("-e", `ANTHROPIC_API_KEY=${agent.model.apiKey}`);
   }

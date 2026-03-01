@@ -1,13 +1,15 @@
-import { Agent } from "../types/agent";
+import { Agent } from "../agent/types/agent";
 
 export function generateDockerfile(agent: Agent): string {
   const lines: string[] = [
     `FROM ${agent.container.baseImage}`,
     "",
-    "RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*",
+    "RUN apt-get update && apt-get install -y git curl jq && rm -rf /var/lib/apt/lists/*",
     "RUN npm install -g @anthropic-ai/claude-code",
     "",
     "ENV HOME=/workspace",
+    `ENV AGENT_NAME=${agent.name}`,
+    "ENV SERVER_URL=http://host.docker.internal:3000",
     "WORKDIR /workspace",
   ];
 
@@ -18,7 +20,7 @@ export function generateDockerfile(agent: Agent): string {
     }
   }
 
-  lines.push("", "COPY workspace/ /workspace/");
+  lines.push("", "COPY workspace/ /workspace/", "RUN chmod -R 777 /workspace");
 
   if (agent.container.ports?.length) {
     lines.push("");

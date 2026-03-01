@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { execSync } from "node:child_process";
-import { Agent } from "../types/agent";
-import { AgentFilesystem } from "../types/agent-filesystem";
+import { Agent } from "../agent/types/agent";
+import { AgentFilesystem } from "../agent/types/agent-filesystem";
 import { generateDockerfile } from "./generate_dockerfile";
 
 export function buildAgentImage(agent: Agent): void {
