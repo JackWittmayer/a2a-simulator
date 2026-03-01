@@ -53,6 +53,8 @@ export function parseSimulationConfig(filePath: string): {
       entrypoint: rawAgentConfig.container?.entrypoint ?? [
         "claude",
         "--print",
+        "--verbose",
+        "--output-format", "stream-json",
         "--dangerously-skip-permissions",
         rawAgentConfig.systemPrompt,
       ],
@@ -64,23 +66,40 @@ export function parseSimulationConfig(filePath: string): {
     );
 
     // Resolve agent skill references to Skill instances
+    // Default skills (get-agents, ping) are always included
+    const defaults = defaultSkills();
     const skillRefs: string[] = rawAgentConfig.skills ?? [];
-    const resolvedSkills: Skill[] = skillRefs.map((name: string) => {
+    const seen = new Set<string>();
+    const resolvedSkills: Skill[] = [];
+
+    // Add all default skills first
+    for (const s of defaults) {
+      if (!seen.has(s.name)) {
+        resolvedSkills.push(s);
+        seen.add(s.name);
+      }
+    }
+
+    // Then add explicitly referenced skills
+    for (const name of skillRefs) {
+      if (seen.has(name)) continue;
       const skill = registry.get(name);
       if (!skill) {
         throw new Error(
           `Agent "${rawAgentConfig.name}" references unknown skill "${name}"`,
         );
       }
-      return skill;
-    });
+      resolvedSkills.push(skill);
+      seen.add(name);
+    }
 
     return {
       name: rawAgentConfig.name,
       skills: resolvedSkills,
       filesystem,
       model,
-      systemPrompt: rawAgentConfig.systemPrompt ?? "",
+      systemPrompt: (rawAgentConfig.systemPrompt ?? "") +
+        "\n\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed.",
       container,
     };
   });

@@ -15,5 +15,17 @@ export function defaultSkills(): Skill[] {
       loadTemplate("receive-messages.md"),
       [{ name: "receive.sh", content: loadTemplate("receive-messages.sh") }],
     ),
+    new Skill(
+      "get-agents",
+      "List all agents you can communicate with and their message counts.",
+      loadTemplate("get-agents.md"),
+      [{ name: "get-agents.sh", content: loadTemplate("get-agents.sh") }],
+    ),
+    new Skill(
+      "ping",
+      "Check if the messaging server is running.",
+      loadTemplate("ping.md"),
+      [{ name: "ping.sh", content: loadTemplate("ping.sh") }],
+    ),
   ];
 }

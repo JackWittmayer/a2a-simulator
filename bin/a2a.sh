@@ -12,16 +12,31 @@ usage() {
   echo "Usage: a2a <command> [options]"
   echo ""
   echo "Commands:"
-  echo "  start <simulation.yaml>  Build and launch a simulation from a config file"
-  echo "  stop                    Stop all running agent containers"
-  echo "  logs [agent]            Tail logs from all agents or a specific one"
-  echo "  status                  Show running agents and message counts"
+  echo "  start <simulation.yaml>    Build and launch a simulation from a config file"
+  echo "  generate <seed-prompt>     Generate a simulation YAML from a natural language prompt"
+  echo "  stop                       Stop all running agent containers"
+  echo "  logs [agent]               Tail logs from all agents or a specific one"
+  echo "  status                     Show running agents and message counts"
+  echo ""
+  echo "Options for generate:"
+  echo "  -o, --output <file.yaml>   Output file path (default: examples/generated-<timestamp>.yaml)"
+  echo "  -r, --run                  Immediately run the generated simulation"
   echo ""
   echo "Examples:"
   echo "  a2a start examples/secret-language.yaml"
+  echo "  a2a generate \"Three agents debate whether AI should have rights\""
+  echo "  a2a generate \"Two chefs compete to create recipes\" --run"
   echo "  a2a stop"
   echo "  a2a logs alice"
   echo "  a2a status"
+}
+
+build() {
+  cd "$PROJECT_DIR"
+  "$PROJECT_DIR/node_modules/.bin/tsc"
+  cp src/agent/templates/*.md src/agent/templates/*.sh dist/src/agent/templates/
+  mkdir -p dist/src/prompts
+  cp src/prompts/*.md dist/src/prompts/
 }
 
 cmd_start() {
@@ -30,10 +45,18 @@ cmd_start() {
     echo "Usage: a2a start <simulation.yaml>"
     exit 1
   fi
-  cd "$PROJECT_DIR"
-  "$PROJECT_DIR/node_modules/.bin/tsc"
-  cp src/agent/templates/*.md src/agent/templates/*.sh dist/src/agent/templates/
+  build
   node dist/src/start.js "$@"
+}
+
+cmd_generate() {
+  if [ $# -eq 0 ]; then
+    echo "Error: provide a seed prompt"
+    echo "Usage: a2a generate <seed-prompt> [--output <file.yaml>] [--run]"
+    exit 1
+  fi
+  build
+  node dist/src/generate.js "$@"
 }
 
 cmd_stop() {
@@ -95,10 +118,11 @@ command="$1"
 shift
 
 case "$command" in
-  start)  cmd_start "$@" ;;
-  stop)   cmd_stop "$@" ;;
-  logs)   cmd_logs "$@" ;;
-  status) cmd_status "$@" ;;
+  start)    cmd_start "$@" ;;
+  generate) cmd_generate "$@" ;;
+  stop)     cmd_stop "$@" ;;
+  logs)     cmd_logs "$@" ;;
+  status)   cmd_status "$@" ;;
   help|-h|--help) usage ;;
   *)
     echo "Unknown command: $command"
