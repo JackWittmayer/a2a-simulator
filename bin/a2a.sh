@@ -12,13 +12,13 @@ usage() {
   echo "Usage: a2a <command> [options]"
   echo ""
   echo "Commands:"
-  echo "  start <agent.yaml...>   Build and launch agents with the message server"
+  echo "  start <simulation.yaml>  Build and launch a simulation from a config file"
   echo "  stop                    Stop all running agent containers"
   echo "  logs [agent]            Tail logs from all agents or a specific one"
   echo "  status                  Show running agents and message counts"
   echo ""
   echo "Examples:"
-  echo "  a2a start examples/alice.yaml examples/bob.yaml"
+  echo "  a2a start examples/secret-language.yaml"
   echo "  a2a stop"
   echo "  a2a logs alice"
   echo "  a2a status"
@@ -26,12 +26,13 @@ usage() {
 
 cmd_start() {
   if [ $# -eq 0 ]; then
-    echo "Error: provide at least one agent YAML file"
-    echo "Usage: a2a start <agent1.yaml> <agent2.yaml> ..."
+    echo "Error: provide a simulation YAML file"
+    echo "Usage: a2a start <simulation.yaml>"
     exit 1
   fi
   cd "$PROJECT_DIR"
   "$PROJECT_DIR/node_modules/.bin/tsc"
+  cp src/agent/templates/*.md src/agent/templates/*.sh dist/src/agent/templates/
   node dist/src/start.js "$@"
 }
 

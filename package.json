@@ -4,8 +4,8 @@
     "a2a": "./bin/a2a.sh"
   },
   "scripts": {
-    "build": "tsc",
-    "start": "tsc && node dist/src/start.js",
+    "build": "tsc && cp src/agent/templates/*.md src/agent/templates/*.sh dist/src/agent/templates/",
+    "start": "tsc && cp src/agent/templates/*.md src/agent/templates/*.sh dist/src/agent/templates/ && node dist/src/start.js",
     "test:e2e": "tsc && node dist/tst/e2e/test_e2e.js",
     "test:e2e:agent": "tsc && node dist/tst/e2e/test_e2e_agent.js"
   },

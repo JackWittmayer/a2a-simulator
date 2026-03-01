@@ -1,36 +1,40 @@
 import { spawn, ChildProcess, execSync } from "node:child_process";
 import { createServer } from "./server/server";
-import { parseAgentConfig } from "./launch/parse_config";
+import { parseSimulationConfig } from "./launch/parse_simulation";
 import { buildAgentImage } from "./launch/build";
 import { launchAgent } from "./launch/launch";
-import { Agent } from "./agent/types/agent";
 
-const configPaths = process.argv.slice(2);
+const configPath = process.argv[2];
 
-if (configPaths.length === 0) {
-  console.error("Usage: a2a-simulator <agent1.yaml> <agent2.yaml> ...");
+if (!configPath) {
+  console.error("Usage: a2a-simulator <simulation.yaml>");
   process.exit(1);
 }
 
-const port = parseInt(process.env.PORT || "3000");
-const host = process.env.HOST || "0.0.0.0";
+console.log(`Parsing simulation config: ${configPath}...`);
+const { config, agents } = parseSimulationConfig(configPath);
 
-// Start server
-const app = createServer();
+const port = config.server?.port ?? parseInt(process.env.PORT || "3000");
+const host = config.server?.host ?? process.env.HOST ?? "0.0.0.0";
+
+console.log(`\nSimulation: ${config.name}`);
+if (config.description) console.log(`  ${config.description}`);
+console.log(`  Agents: ${agents.map((a) => a.name).join(", ")}`);
+if (config.apis?.length) {
+  console.log(`  APIs: ${config.apis.map((a) => `${a.method} ${a.path}`).join(", ")}`);
+}
+
+// Start server with custom APIs
+const app = createServer(config.apis);
 const server = app.listen(port, host, () => {
-  console.log(`Server listening on http://${host}:${port}`);
+  console.log(`\nServer listening on http://${host}:${port}`);
 });
 
 // Build and launch agents
-const agents: Agent[] = [];
 const logProcesses: ChildProcess[] = [];
 
-for (const configPath of configPaths) {
-  console.log(`\nParsing ${configPath}...`);
-  const agent = parseAgentConfig(configPath);
-  agents.push(agent);
-
-  console.log(`Building image for ${agent.name}...`);
+for (const agent of agents) {
+  console.log(`\nBuilding image for ${agent.name}...`);
   buildAgentImage(agent);
 
   console.log(`Launching ${agent.name}...`);
@@ -66,7 +70,6 @@ function shutdown() {
   for (const agent of agents) {
     try {
       console.log(`Stopping ${agent.name}...`);
-      // Use docker kill for immediate stop instead of graceful shutdown
       execSync(`docker kill ${agent.name}`, { stdio: "ignore" });
     } catch {
       // container may already be stopped
