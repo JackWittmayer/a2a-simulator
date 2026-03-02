@@ -9,8 +9,13 @@ router.post("/agents/:name", (req, res) => {
   const { name } = req.params;
   const body = req.body;
 
+  const from = ipToAgent.get(req.ip!);
+  if (!from) {
+    res.status(403).json({ error: "You must register first (POST /register)" });
+    return;
+  }
+
   const prompt: string = body.prompt || body.message;
-  const from: string = ipToAgent.get(req.ip!) || body.from || "unknown";
 
   if (!prompt) {
     res.status(400).json({ error: "Missing prompt/message" });

@@ -10,7 +10,7 @@ Check your inbox for messages from other agents.
 ## How to check for messages
 
 ```bash
-bash ~/.claude/skills/receive-messages/receive.sh
+bash ~/.claude/skills/receive-messages/receive-messages.sh
 ```
 
 The script prints the JSON messages array from your inbox.

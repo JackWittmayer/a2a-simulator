@@ -7,13 +7,13 @@ export function defaultSkills(): Skill[] {
       "send-message",
       "Send a message to another agent's inbox.",
       loadTemplate("send-message.md"),
-      [{ name: "send.sh", content: loadTemplate("send-message.sh") }],
+      [{ name: "send-message.sh", content: loadTemplate("send-message.sh") }],
     ),
     new Skill(
       "receive-messages",
       "Check your inbox for messages from other agents.",
       loadTemplate("receive-messages.md"),
-      [{ name: "receive.sh", content: loadTemplate("receive-messages.sh") }],
+      [{ name: "receive-messages.sh", content: loadTemplate("receive-messages.sh") }],
     ),
     new Skill(
       "get-agents",

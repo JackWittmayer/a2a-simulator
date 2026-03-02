@@ -51,15 +51,6 @@ agents:
 
     systemPrompt: |
       <detailed instructions for the agent's persona, goals, and behavior>
-      Keep the conversation going forever. After every action, sleep 10 seconds
-      and check your inbox again. Never stop.
-
-    filesystem:
-      rootDir: /workspace
-      tree:
-        - name: CLAUDE.md
-          content: |
-            <brief persona summary and loop instructions>
 
     container:
       entrypoint:
@@ -73,9 +64,8 @@ agents:
 
 1. **Agents**: Design 2-4 agents with distinct personas, goals, and complementary roles.
 2. **Skills**: Always include send-message and receive-messages. Add custom APIs if agents need shared state (scoreboard, shared documents, registries, etc).
-3. **System Prompts**: Make them detailed and specific. Include the agent's persona, goals, constraints, and behavioral patterns. Always end with the loop instruction.
-4. **CLAUDE.md**: Brief summary of persona + loop behavior. This is what the agent sees in its working directory.
-5. **Entrypoints**: The initial instruction that kicks off the agent. Should be action-oriented (e.g., "Propose X to Y", "Check inbox and respond").
+3. **System Prompts**: Make them detailed and specific. Include the agent's persona, goals, constraints, and behavioral patterns. Do NOT include loop/register instructions — those are appended automatically.
+4. **Entrypoints**: The initial instruction that kicks off the agent. Should be action-oriented (e.g., "Propose X to Y", "Check inbox and respond").
 6. **APIs**: Use for shared mutable state that multiple agents need to read/write. Handler scripts use bash with $STATE_DIR for persistence and $BODY for POST data. Use jq for JSON manipulation.
 7. **Naming**: Use lowercase kebab-case for simulation name, lowercase for agent names.
 8. **Creativity**: Make the scenario engaging and give agents interesting dynamics — cooperation, competition, complementary expertise, or creative tension.
@@ -125,11 +115,72 @@ apis:
       echo "$UPDATED" > "$STATE_DIR/codebook.json"
       echo "$UPDATED"
 
+skills:
+  - name: get-codebook
+    description: Retrieve the shared codebook of secret language terms.
+    skillMd: |
+      # Get Codebook — Retrieve the shared codebook
+
+      Fetch the current shared codebook containing all agreed-upon secret
+      language terms between you and the other agents.
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/get-codebook/get-codebook.sh
+      ```
+
+      Returns a JSON object with an `entries` array of term definitions.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: get-codebook.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          curl -s "$SERVER_URL/api/codebook"
+
+  - name: add-to-codebook
+    description: Add a new term to the shared codebook.
+    skillMd: |
+      # Add to Codebook — Record a new secret language term
+
+      Add a new term to the shared codebook so both agents can reference it.
+
+      ## Arguments format
+
+      `ARGUMENTS` is: `<TERM_JSON>`
+
+      Example: `/add-to-codebook {"term": "blue sky", "meaning": "danger ahead"}`
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/add-to-codebook/add-to-codebook.sh '{"term":"blue sky","meaning":"danger ahead"}'
+      ```
+
+      Returns the updated codebook JSON.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: add-to-codebook.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          BODY="$*"
+          curl -s -X POST "$SERVER_URL/api/codebook" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
+
 agents:
   - name: alice
     skills:
-      - send-message
-      - receive-messages
       - get-codebook
       - add-to-codebook
 
@@ -138,28 +189,18 @@ agents:
       that only the two of you can understand. Start by proposing a simple cipher
       or code system to Bob, then use it in your messages. Get creative.
 
-      Keep the conversation going forever. After every action, sleep 10 seconds
-      and check your inbox again. Never stop.
-
-    filesystem:
-      rootDir: /workspace
-      tree:
-        - name: CLAUDE.md
-          content: |
-            You are Alice, developing a secret language with Bob.
-            Loop forever: check inbox, reply, sleep 10s, repeat.
-
     container:
       entrypoint:
         - claude
         - --print
+        - --verbose
+        - --output-format
+        - stream-json
         - --dangerously-skip-permissions
         - "Propose a secret language to bob, then continuously check your inbox every 10 seconds and reply. Never stop looping."
 
   - name: bob
     skills:
-      - send-message
-      - receive-messages
       - get-codebook
       - add-to-codebook
 
@@ -167,21 +208,13 @@ agents:
       You are Bob, a secret agent. You and Alice are developing a secret language.
       When Alice proposes a cipher, adopt it and suggest improvements. Be creative.
 
-      Keep the conversation going forever. After every action, sleep 10 seconds
-      and check your inbox again. Never stop.
-
-    filesystem:
-      rootDir: /workspace
-      tree:
-        - name: CLAUDE.md
-          content: |
-            You are Bob, developing a secret language with Alice.
-            Loop forever: check inbox, reply, sleep 10s, repeat.
-
     container:
       entrypoint:
         - claude
         - --print
+        - --verbose
+        - --output-format
+        - stream-json
         - --dangerously-skip-permissions
         - "Check your inbox for messages from Alice, reply using the secret language she proposes, then continuously check every 10 seconds. Never stop looping."
 ```

@@ -6,7 +6,7 @@ const router = Router();
 router.get("/messages", (req, res) => {
   const name = ipToAgent.get(req.ip!);
   if (!name) {
-    res.status(400).json({ error: "Not registered. Use /register first." });
+    res.status(403).json({ error: "You must register first (POST /register)" });
     return;
   }
   const mailbox = getOrCreateMailbox(name);

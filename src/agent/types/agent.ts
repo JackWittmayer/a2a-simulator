@@ -26,6 +26,27 @@ export function buildAgent(
     );
   }
 
+  const systemPrompt = (agentConfig.systemPrompt ?? "") +
+    "\n\nFirst, register with the server using /register. Then loop forever: check inbox, reply, sleep 10s, repeat." +
+    "\n\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed.";
+
+  const baseEntrypoint = agentConfig.container?.entrypoint ?? [
+    "claude",
+    "--print",
+    "--verbose",
+    "--output-format", "stream-json",
+    "--dangerously-skip-permissions",
+    agentConfig.systemPrompt,
+  ];
+
+  // Inject --system-prompt and --no-session-persistence after "claude"
+  const entrypoint = [
+    baseEntrypoint[0],
+    "--system-prompt", systemPrompt,
+    "--no-session-persistence",
+    ...baseEntrypoint.slice(1),
+  ];
+
   const container = {
     baseImage:
       agentConfig.container?.baseImage ??
@@ -39,14 +60,7 @@ export function buildAgent(
     installCommands:
       agentConfig.container?.installCommands ??
       config.container?.installCommands,
-    entrypoint: agentConfig.container?.entrypoint ?? [
-      "claude",
-      "--print",
-      "--verbose",
-      "--output-format", "stream-json",
-      "--dangerously-skip-permissions",
-      agentConfig.systemPrompt,
-    ],
+    entrypoint,
   };
 
   const filesystem = new AgentFilesystem(
@@ -74,8 +88,7 @@ export function buildAgent(
     skills,
     filesystem,
     model,
-    systemPrompt: (agentConfig.systemPrompt ?? "") +
-      "\n\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed.",
+    systemPrompt,
     container,
   };
 }

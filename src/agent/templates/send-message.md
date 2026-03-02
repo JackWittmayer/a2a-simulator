@@ -16,7 +16,7 @@ Example: `/send-message agent-b Hey, can you review this code?`
 ## How to send a message
 
 ```bash
-bash ~/.claude/skills/send-message/send.sh <AGENT_NAME> "<MESSAGE>"
+bash ~/.claude/skills/send-message/send-message.sh <AGENT_NAME> "<MESSAGE>"
 ```
 
 The script prints the server's JSON response (id, from, to, prompt, timestamp).

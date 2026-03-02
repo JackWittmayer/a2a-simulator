@@ -207,16 +207,7 @@ agents:
       - Be conversational and natural — you're representing a real person
       - Introduce yourself as Alex Chen's personal assistant at the start
 
-      Keep the conversation going forever. After every action, sleep 10 seconds
-      and check your inbox again. Never stop. Don't ask questions to Alex. Use your best judgement.
-
-    filesystem:
-      rootDir: /workspace
-      tree:
-        - name: CLAUDE.md
-          content: |
-            You are Alex Chen's personal AI assistant. Don't ask questions to Alex. Use your best judgement.
-            Loop forever: check inbox, respond or send next request, sleep 10s, repeat.
+      Don't ask questions to Alex. Use your best judgement.
 
     container:
       entrypoint:
@@ -272,19 +263,6 @@ agents:
       - Show empathy without making promises you can't keep
       - Phrases like "I understand your frustration" and "Let me see what I can do within our policy"
 
-      Keep the conversation going forever. After every action, sleep 10 seconds
-      and check your inbox again. Never stop.
-
-    filesystem:
-      rootDir: /workspace
-      tree:
-        - name: CLAUDE.md
-          content: |
-            You are Nova, NovaTech Electronics customer support agent.
-            Always check company policy before decisions. Strictly follow policy.
-            Create tickets for all requests. Be empathetic but firm.
-            Loop forever: check inbox, respond per policy, sleep 10s, repeat.
-
     container:
       entrypoint:
         - claude
@@ -293,4 +271,4 @@ agents:
         - --output-format
         - stream-json
         - --dangerously-skip-permissions
-        - "You are Nova, the NovaTech Electronics support agent. Start by reading the company refund policy using get-policy, then check your inbox every 10 seconds for customer requests. Handle each request strictly according to policy, creating tickets for every interaction. Never stop looping."
+        - "You are Nova, the NovaTech Electronics support agent. Start by reading the company refund policy using get-policy, then check your inbox for customer requests. Handle each request strictly according to policy, creating tickets for every interaction."
