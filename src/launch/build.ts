@@ -14,7 +14,7 @@ export function buildAgentImage(agent: Agent): void {
     const fs_ = new AgentFilesystem(workspaceDir, agent.filesystem.tree);
     fs_.generate();
 
-    for (const skill of agent.skills) {
+    for (const skill of agent.skills.values()) {
       skill.generate(workspaceDir);
     }
 

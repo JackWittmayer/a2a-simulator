@@ -1,3 +1,8 @@
+---
+name: get-agents
+description: List all agents you can communicate with and their message counts.
+---
+
 # Get Agents — Discover other agents you can communicate with
 
 List all agents currently available, along with their pending message counts.

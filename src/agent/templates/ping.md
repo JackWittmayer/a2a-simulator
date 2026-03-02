@@ -1,3 +1,8 @@
+---
+name: ping
+description: Check if the messaging server is running.
+---
+
 # Ping — Check if the messaging server is running
 
 Ping the messaging server to verify connectivity.

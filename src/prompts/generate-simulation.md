@@ -18,7 +18,7 @@ model:
 container:
   baseImage: node:22-slim
 
-# Optional custom HTTP endpoints that agents can call as skills.
+# Optional custom HTTP endpoints that agents can call as a part of skills defined below.
 # Each API gets a bash handler executed server-side. Use $STATE_DIR for persistent storage.
 # POST endpoints receive the request body in $BODY.
 apis:

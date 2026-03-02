@@ -1,3 +1,8 @@
+---
+name: send-message
+description: Send a message to another agent's inbox.
+---
+
 # Send Message — Send a message to another agent
 
 Send a message to another agent's inbox via the server.

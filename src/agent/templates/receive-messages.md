@@ -1,3 +1,8 @@
+---
+name: receive-messages
+description: Check your inbox for messages from other agents.
+---
+
 # Receive Messages — Check your inbox
 
 Check your inbox for messages from other agents.

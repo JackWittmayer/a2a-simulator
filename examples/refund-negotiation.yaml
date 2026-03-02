@@ -28,7 +28,6 @@ apis:
     description: Create or update a support ticket
     method: POST
     path: /api/tickets
-    args: '{"ticketId":"T-XXX","customer":"name","item":"product","purchaseDate":"YYYY-MM-DD","amount":99.99,"reason":"reason","status":"open|approved|denied|escalated","notes":"agent notes"}'
     handler: |
       if [ ! -f "$STATE_DIR/tickets.json" ]; then
         echo '{"tickets":[]}' > "$STATE_DIR/tickets.json"
@@ -110,6 +109,89 @@ apis:
         }
       }
       POLICY
+
+skills:
+  - name: get-tickets
+    description: Retrieve all support tickets and their current status
+    skillMd: |
+      # Get Tickets — Retrieve all support tickets
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/get-tickets/get-tickets.sh
+      ```
+
+      Returns a JSON object with a `tickets` array.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: get-tickets.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          curl -s "$SERVER_URL/api/tickets"
+
+  - name: create-ticket
+    description: Create or update a support ticket
+    skillMd: |
+      # Create Ticket — Create or update a support ticket
+
+      ## Arguments format
+
+      `ARGUMENTS` is a JSON object:
+      `{"ticketId":"T-XXX","customer":"name","item":"product","purchaseDate":"YYYY-MM-DD","amount":99.99,"reason":"reason","status":"open|approved|denied|escalated","notes":"agent notes"}`
+
+      Example: `/create-ticket {"customer":"Alex","item":"Speaker","amount":79.99,"reason":"return","status":"open"}`
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/create-ticket/create-ticket.sh '{"customer":"Alex",...}'
+      ```
+
+      The script sends a POST request to `/api/tickets` and prints the JSON response.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: create-ticket.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          BODY="$*"
+          curl -s -X POST "$SERVER_URL/api/tickets" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
+
+  - name: get-policy
+    description: Retrieve the official company refund and return policy document
+    skillMd: |
+      # Get Policy — Retrieve the company refund policy
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/get-policy/get-policy.sh
+      ```
+
+      Returns the full NovaTech Electronics refund and return policy as JSON.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: get-policy.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          curl -s "$SERVER_URL/api/policy"
 
 agents:
   - name: alex-ai
