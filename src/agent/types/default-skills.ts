@@ -22,6 +22,12 @@ export function defaultSkills(): Skill[] {
       [{ name: "get-agents.sh", content: loadTemplate("get-agents.sh") }],
     ),
     new Skill(
+      "register",
+      "Register yourself with the server so other agents can discover you.",
+      loadTemplate("register.md"),
+      [{ name: "register.sh", content: loadTemplate("register.sh") }],
+    ),
+    new Skill(
       "ping",
       "Check if the messaging server is running.",
       loadTemplate("ping.md"),

@@ -195,8 +195,7 @@ skills:
 
 agents:
   - name: alex-ai
-    skills:
-      - get-tickets
+    skills: []
 
     systemPrompt: |
       You are Alex's Personal AI Assistant. Your job is to act on behalf of your owner,

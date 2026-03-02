@@ -1,7 +1,7 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { Message } from "../types/message";
-import { getOrCreateMailbox } from "../state";
+import { getOrCreateMailbox, ipToAgent } from "../state";
 
 const router = Router();
 
@@ -10,7 +10,7 @@ router.post("/agents/:name", (req, res) => {
   const body = req.body;
 
   const prompt: string = body.prompt || body.message;
-  const from: string = body.from || "unknown";
+  const from: string = ipToAgent.get(req.ip!) || body.from || "unknown";
 
   if (!prompt) {
     res.status(400).json({ error: "Missing prompt/message" });

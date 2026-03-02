@@ -7,6 +7,7 @@ import sendMessage from "./api/send-message";
 import receiveMessages from "./api/receive-messages";
 import ping from "./api/ping";
 import getAgents from "./api/get-agents";
+import register from "./api/register";
 import { ApiEndpoint } from "../agent/types/api-endpoint";
 
 export function createServer(apis?: ApiEndpoint[]) {
@@ -17,6 +18,7 @@ export function createServer(apis?: ApiEndpoint[]) {
   app.use(receiveMessages);
   app.use(ping);
   app.use(getAgents);
+  app.use(register);
 
   if (apis) {
     const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "a2a-state-"));

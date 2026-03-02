@@ -1,11 +1,17 @@
 import { Router } from "express";
-import { getOrCreateMailbox } from "../state";
+import { getOrCreateMailbox, ipToAgent } from "../state";
 
 const router = Router();
 
-router.get("/agents/:name/messages", (req, res) => {
-  const mailbox = getOrCreateMailbox(req.params.name);
-  res.json({ messages: mailbox.messages });
+router.get("/messages", (req, res) => {
+  const name = ipToAgent.get(req.ip!);
+  if (!name) {
+    res.status(400).json({ error: "Not registered. Use /register first." });
+    return;
+  }
+  const mailbox = getOrCreateMailbox(name);
+  const messages = mailbox.messages.splice(0);
+  res.json({ messages });
 });
 
 export default router;

@@ -24,4 +24,3 @@ The script prints the server's JSON response (id, from, to, prompt, timestamp).
 ## Environment variables
 
 - `SERVER_URL` — server base URL (default: http://localhost:3000)
-- `AGENT_NAME` — your own agent name (used as the "from" field)

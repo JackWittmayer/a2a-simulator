@@ -8,7 +8,6 @@ export function generateDockerfile(agent: Agent): string {
     "RUN npm install -g @anthropic-ai/claude-code",
     "",
     "ENV HOME=/workspace",
-    `ENV AGENT_NAME=${agent.name}`,
     "ENV SERVER_URL=http://host.docker.internal:3000",
     "WORKDIR /workspace",
   ];
