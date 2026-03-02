@@ -93,7 +93,12 @@ export function processStreamLine(agentName: string, line: string): string | nul
       if (data.message?.content) {
         const parts: string[] = [];
         for (const block of data.message.content) {
-          if (block.type === "text" && block.text) {
+          if (block.type === "thinking" && block.thinking) {
+            const thought = block.thinking.length > 200
+              ? block.thinking.slice(0, 200) + "…"
+              : block.thinking;
+            parts.push(`  💭 ${thought}`);
+          } else if (block.type === "text" && block.text) {
             parts.push(block.text);
           } else if (block.type === "tool_use") {
             parts.push(formatToolCall(block));

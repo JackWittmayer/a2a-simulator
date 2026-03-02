@@ -4,7 +4,7 @@ export function generateDockerfile(agent: Agent): string {
   const lines: string[] = [
     `FROM ${agent.container.baseImage}`,
     "",
-    "RUN apt-get update && apt-get install -y git curl jq && rm -rf /var/lib/apt/lists/*",
+    "RUN apt-get update && apt-get install -y git curl jq python3 && rm -rf /var/lib/apt/lists/*",
     "RUN npm install -g @anthropic-ai/claude-code",
     "",
     "ENV HOME=/workspace",

@@ -28,7 +28,9 @@ export function buildAgent(
 
   const systemPrompt = (agentConfig.systemPrompt ?? "") +
     "\n\nFirst, register with the server using /register. Then loop forever: check inbox, reply, sleep 10s, repeat." +
-    "\n\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed.";
+    "\n\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed." +
+    "\n\nIf the other agent has not replied after a reasonable wait, send a follow-up message to nudge them." +
+    " Do not give up or stop — keep the conversation going by re-sending or rephrasing your last message if needed.";
 
   const baseEntrypoint = agentConfig.container?.entrypoint ?? [
     "claude",
@@ -44,6 +46,7 @@ export function buildAgent(
     baseEntrypoint[0],
     "--system-prompt", systemPrompt,
     "--no-session-persistence",
+    "--disallowedTools", "AskUserQuestion,EnterPlanMode",
     ...baseEntrypoint.slice(1),
   ];
 

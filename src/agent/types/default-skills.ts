@@ -33,5 +33,11 @@ export function defaultSkills(): Skill[] {
       loadTemplate("ping.md"),
       [{ name: "ping.sh", content: loadTemplate("ping.sh") }],
     ),
+    new Skill(
+      "poll-messages",
+      "Poll your inbox until new messages arrive, then print them.",
+      loadTemplate("poll-messages.md"),
+      [{ name: "poll-messages.sh", content: loadTemplate("poll-messages.sh") }],
+    ),
   ];
 }
