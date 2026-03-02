@@ -20,8 +20,8 @@ export async function generateSimulation(
   seedPrompt: string,
   outputPath?: string,
 ): Promise<string> {
-  const template = loadPromptTemplate();
-  const fullPrompt = template + seedPrompt;
+  const systemPrompt = loadPromptTemplate();
+  const prompt = `Given the seed prompt below, output ONLY valid YAML for a simulation config. No explanation, no markdown fences, no preamble — just the raw YAML content.\n\nSeed prompt: ${seedPrompt}`;
 
   console.log("Generating simulation config from seed prompt...");
   console.log(`  Seed: "${seedPrompt}"`);
@@ -35,10 +35,9 @@ export async function generateSimulation(
   delete env.CLAUDECODE;
 
   for await (const message of query({
-    prompt: fullPrompt,
+    prompt,
     options: {
-      systemPrompt:
-        "You are a simulation config generator. Output ONLY valid YAML. No explanation, no markdown fences, no preamble.",
+      systemPrompt,
       allowedTools: [],
       maxTurns: 1,
       permissionMode: "bypassPermissions",
