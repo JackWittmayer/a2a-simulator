@@ -1,6 +1,5 @@
-import { Message } from "./message";
-
 export interface Mailbox {
   name: string;
-  messages: Message[];
+  status: string;
+  statusUpdatedAt: string;
 }

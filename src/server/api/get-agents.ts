@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { agents, ipToAgent } from "../state";
+import { agents, ipToAgent, messageLog, cursors } from "../state";
 
 const router = Router();
 
@@ -11,10 +11,18 @@ router.get("/agents", (req, res) => {
   }
   const list = [...agents.values()]
     .filter((a) => a.name !== self)
-    .map((a) => ({
-      name: a.name,
-      messageCount: a.messages.length,
-    }));
+    .map((a) => {
+      const cursor = cursors.get(a.name) ?? 0;
+      const messageCount = messageLog.filter(
+        (m, i) => i >= cursor && m.to === a.name,
+      ).length;
+      return {
+        name: a.name,
+        messageCount,
+        status: a.status,
+        statusUpdatedAt: a.statusUpdatedAt,
+      };
+    });
   res.json({ agents: list });
 });
 

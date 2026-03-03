@@ -41,7 +41,27 @@ skills:
     description: <what it does>
     skillMd: |
       # Skill Name — Short description
-      <markdown documentation for the agent>
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/<skill-name>/<skill-name>.sh [args]
+      ```
+
+      <what it returns and any other notes>
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: <skill-name>.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          curl -s [-X POST] "$SERVER_URL/api/<path>" \
+            [-H "Content-Type: application/json"] \
+            [-d "$*"]
 
 agents:
   - name: <agent-name>
@@ -77,7 +97,7 @@ agent automatically — do NOT list them in the YAML:
 ## Design Guidelines
 
 1. **Agents**: Design 2-4 agents with distinct personas, goals, and complementary roles.
-2. **Skills**: Built-in skills are added automatically — only list custom skills an agent needs. Add custom APIs if agents need shared state (scoreboard, shared documents, registries, etc).
+2. **Skills**: Built-in skills are added automatically — only list custom skills an agent needs. Add custom APIs if agents need shared state (scoreboard, shared documents, registries, etc). **Every custom skill MUST include a `files` section** with an executable bash script that curls the corresponding API endpoint. The `skillMd` must document how to run the script (e.g., `bash ~/.claude/skills/<name>/<name>.sh`). Without the `files` section, agents will fail with "No such file or directory" errors. For GET endpoints the script just curls the URL; for POST endpoints it passes `"$*"` as the request body.
 3. **System Prompts**: Make them detailed and specific. Include the agent's persona, goals, constraints, and behavioral patterns.
 4. **Entrypoints**: The last element is the initial instruction that kicks off the agent. Should be action-oriented (e.g., "Propose X to Y", "Check inbox and respond").
 5. **APIs**: Use for shared mutable state that multiple agents need to read/write. Handler scripts use bash with $STATE_DIR for persistence and $BODY for POST data. Use jq for JSON manipulation.

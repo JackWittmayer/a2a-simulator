@@ -8,6 +8,8 @@ import receiveMessages from "./api/receive-messages";
 import ping from "./api/ping";
 import getAgents from "./api/get-agents";
 import register from "./api/register";
+import streamMessages from "./api/stream-messages";
+import updateStatus from "./api/update-status";
 import { ApiEndpoint } from "../agent/types/api-endpoint";
 
 export function createServer(apis?: ApiEndpoint[]) {
@@ -16,9 +18,11 @@ export function createServer(apis?: ApiEndpoint[]) {
 
   app.use(sendMessage);
   app.use(receiveMessages);
+  app.use(streamMessages);
   app.use(ping);
   app.use(getAgents);
   app.use(register);
+  app.use(updateStatus);
 
   if (apis) {
     const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "a2a-state-"));

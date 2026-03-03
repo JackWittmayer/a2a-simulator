@@ -8,6 +8,11 @@ MESSAGE="$*"
 
 BODY=$(jq -n --arg prompt "$MESSAGE" '{prompt: $prompt}')
 
-curl -s -X POST "$SERVER_URL/agents/$TO" \
-  -H "Content-Type: application/json" \
-  -d "$BODY"
+IFS=',' read -ra RECIPIENTS <<< "$TO"
+for recipient in "${RECIPIENTS[@]}"; do
+  recipient=$(echo "$recipient" | xargs)
+  curl -s -X POST "$SERVER_URL/agents/$recipient" \
+    -H "Content-Type: application/json" \
+    -d "$BODY"
+  echo
+done

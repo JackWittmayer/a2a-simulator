@@ -6,13 +6,11 @@ export function formatToolCall(block: any): string {
   const input = block.input ?? {};
 
   if (name === "Bash") {
-    // Extract skill name from command if it's a skill invocation
     const cmd: string = input.command ?? "";
     const skillMatch = cmd.match(/skills\/([^/]+)\//);
     if (skillMatch) {
       return `[${skillMatch[1]}]`;
     }
-    // For sleep+skill combos
     const sleepSkillMatch = cmd.match(/sleep\s+\d+\s*&&.*skills\/([^/]+)\//);
     if (sleepSkillMatch) {
       return `[${sleepSkillMatch[1]}] (polling)`;
@@ -21,7 +19,8 @@ export function formatToolCall(block: any): string {
   }
 
   if (name === "Skill") {
-    return `[${input.skill ?? "skill"}]${input.args ? " " + input.args.slice(0, 80) : ""}`;
+    const skill = input.skill ?? "skill";
+    return `[${skill}]${input.args ? " " + input.args.slice(0, 80) : ""}`;
   }
 
   // Generic fallback
@@ -40,19 +39,32 @@ export function formatToolResult(content: string): string | null {
     if (data.messages && Array.isArray(data.messages)) {
       const msgs = data.messages;
       if (msgs.length === 0) return "  → inbox: empty";
-      const senders = [...new Set(msgs.map((m: any) => m.from))];
-      return `  → inbox: ${msgs.length} message(s) from ${senders.join(", ")}`;
+      return msgs.map((m: any) =>
+        `  📨 ${m.from}: ${m.prompt ?? "(no content)"}`
+      ).join("\n");
     }
 
     // Agent list response
     if (data.agents && Array.isArray(data.agents)) {
-      const names = data.agents.map((a: any) => a.name).join(", ");
-      return `  → agents: ${names}`;
+      const entries = data.agents.map((a: any) => {
+        const parts = [a.name];
+        if (a.status) parts.push(`(${a.status})`);
+        return parts.join(" ");
+      });
+      return `  → agents: ${entries.join(", ")}`;
     }
 
-    // Sent message confirmation
+    // Sent message confirmation — show the full message
+    if (data.id && data.from && data.to && data.prompt) {
+      return `  📤 → ${data.to}: ${data.prompt}`;
+    }
     if (data.id && data.from && data.to) {
       return `  → sent to ${data.to}`;
+    }
+
+    // Registration
+    if (data.registered) {
+      return `  → registered as "${data.registered}"`;
     }
 
     // Ticket responses
@@ -61,8 +73,8 @@ export function formatToolResult(content: string): string | null {
       return `  → ${count} ticket(s)`;
     }
 
-    // Status check
-    if (data.status) {
+    // Status update
+    if (data.name && data.status && data.statusUpdatedAt) {
       return `  → status: ${data.status}`;
     }
 
@@ -107,18 +119,27 @@ export function processStreamLine(agentName: string, line: string): string | nul
         if (parts.length) return parts.join("\n");
       }
     } else if (type === "user") {
-      // Tool results
+      // Suppress "Launching skill:" messages — they're noise
       if (data.message?.content) {
         const parts: string[] = [];
         for (const block of data.message.content) {
-          if (block.type === "tool_result" && block.content) {
-            const summary = formatToolResult(block.content);
-            if (summary) parts.push(summary);
+          if (block.type === "tool_result") {
+            if (block.is_error) {
+              parts.push(`  ✗ ERROR: ${block.content}`);
+            } else if (block.content) {
+              // Skip "Launching skill: X" messages
+              if (typeof block.content === "string" && block.content.startsWith("Launching skill:")) {
+                continue;
+              }
+              const summary = formatToolResult(block.content);
+              if (summary) parts.push(summary);
+            }
           }
         }
         if (parts.length) return parts.join("\n");
       }
     } else if (type === "result") {
+      if (data.is_error) return `✗ ERROR: ${data.result ?? data.error ?? "unknown error"}`;
       if (data.result) return data.result;
     }
 

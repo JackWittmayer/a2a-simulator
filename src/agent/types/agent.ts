@@ -26,11 +26,16 @@ export function buildAgent(
     );
   }
 
-  const systemPrompt = (agentConfig.systemPrompt ?? "") +
-    "\n\nFirst, register with the server using /register. Then loop forever: check inbox, reply, sleep 10s, repeat." +
+  const serverPort = config.server?.port ?? 3000;
+  const serverUrl = `http://host.docker.internal:${serverPort}`;
+
+  const systemPrompt =
+    `YOUR VERY FIRST ACTION must be: export SERVER_URL=${serverUrl} && then run /start-listener in the background (run_in_background=true). Do this BEFORE anything else — do not think about your task first.` +
+    "\n\nUse /check-inbox to read new messages. Use /send-message to reply. Use /get-agents to see who's available." +
+    "\n\nUse /update-status before and after doing work (e.g. 'thinking', 'coding', 'idle')." +
+    "\n\nAfter every action, run /check-inbox to see if new messages have arrived. NEVER stop working — keep checking your inbox and responding." +
     "\n\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed." +
-    "\n\nIf the other agent has not replied after a reasonable wait, send a follow-up message to nudge them." +
-    " Do not give up or stop — keep the conversation going by re-sending or rephrasing your last message if needed.";
+    "\n\n---\n\n" + (agentConfig.systemPrompt ?? "");
 
   const baseEntrypoint = agentConfig.container?.entrypoint ?? [
     "claude",
@@ -45,7 +50,6 @@ export function buildAgent(
   const entrypoint = [
     baseEntrypoint[0],
     "--system-prompt", systemPrompt,
-    "--no-session-persistence",
     "--disallowedTools", "AskUserQuestion,EnterPlanMode",
     ...baseEntrypoint.slice(1),
   ];

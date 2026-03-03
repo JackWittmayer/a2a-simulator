@@ -20,8 +20,14 @@ const { config, agents } = parseSimulationConfig(configPath);
 const port = config.server?.port ?? parseInt(process.env.PORT || "3000");
 const host = config.server?.host ?? process.env.HOST ?? "0.0.0.0";
 
-// Set up debug log directory
-const logsDir = path.join("logs", config.name);
+// Set up debug log directory with timestamp
+const pad = (n: number) => String(n).padStart(2, "0");
+function toPST(date: Date) {
+  return new Date(date.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+}
+const pst = toPST(new Date());
+const timestamp = `${pst.getFullYear()}-${pad(pst.getMonth() + 1)}-${pad(pst.getDate())}_${pad(pst.getHours())}h${pad(pst.getMinutes())}m${pad(pst.getSeconds())}s`;
+const logsDir = path.join("logs", config.name, timestamp);
 fs.mkdirSync(logsDir, { recursive: true });
 
 console.log(`\nSimulation: ${config.name}`);
@@ -32,15 +38,33 @@ if (config.apis?.length) {
 }
 console.log(`  Debug logs: ${logsDir}/`);
 
-// Start server with custom APIs
+// Start server and wait for it to be ready before launching agents
 const app = createServer(config.apis);
-const server = app.listen(port, host, () => {
-  console.log(`\nServer listening on http://${host}:${port}`);
+
+let server: ReturnType<typeof app.listen>;
+
+(async () => {
+server = await new Promise<ReturnType<typeof app.listen>>((resolve) => {
+  const s = app.listen(port, host, () => {
+    console.log(`\nServer listening on http://${host}:${port}`);
+    resolve(s);
+  });
 });
+
+// Combined logs (all agents in one file)
+const combinedDebugStream = fs.createWriteStream(
+  path.join(logsDir, "combined.debug.log")
+);
+combinedDebugStream.write(`--- Session started at ${new Date().toISOString()} ---\n`);
+
+const combinedReadableStream = fs.createWriteStream(
+  path.join(logsDir, "combined.log")
+);
+combinedReadableStream.write(`=== ${config.name} — ${new Date().toISOString()} ===\n\n`);
 
 // Build and launch agents
 const logProcesses: ChildProcess[] = [];
-const debugStreams = new Map<string, fs.WriteStream>();
+const logStreams: fs.WriteStream[] = [combinedDebugStream, combinedReadableStream];
 
 for (const agent of agents) {
   console.log(`\nBuilding image for ${agent.name}...`);
@@ -50,11 +74,19 @@ for (const agent of agents) {
   const containerId = launchAgent(agent);
   console.log(`  ${agent.name} running (${containerId.slice(0, 12)})`);
 
-  // Open debug log file for this agent
-  const debugFile = path.join(logsDir, `${agent.name}.debug.log`);
-  const debugStream = fs.createWriteStream(debugFile, { flags: "a" });
-  debugStreams.set(agent.name, debugStream);
-  debugStream.write(`\n--- Session started at ${new Date().toISOString()} ---\n`);
+  // Raw JSONL log (everything)
+  const debugStream = fs.createWriteStream(
+    path.join(logsDir, `${agent.name}.debug.log`)
+  );
+  debugStream.write(`--- Session started at ${new Date().toISOString()} ---\n`);
+
+  // Human-readable log
+  const readableStream = fs.createWriteStream(
+    path.join(logsDir, `${agent.name}.log`)
+  );
+  readableStream.write(`=== ${agent.name} — ${new Date().toISOString()} ===\n\n`);
+
+  logStreams.push(debugStream, readableStream);
 
   // Stream container logs
   const logProc = spawn("docker", ["logs", "-f", agent.name], {
@@ -66,14 +98,18 @@ for (const agent of agents) {
     for (const line of data.toString().split("\n")) {
       if (!line) continue;
 
-      // Always write to debug log
-      debugStream.write(line + "\n");
+      const ts = new Date().toISOString();
+      debugStream.write(ts + "\t" + line + "\n");
+      combinedDebugStream.write(ts + "\t" + agent.name + "\t" + line + "\n");
 
-      // Parse stream-json and only show meaningful output
       const display = processStreamLine(agent.name, line);
       if (display) {
         for (const displayLine of display.split("\n")) {
-          if (displayLine) console.log(`${prefix} ${displayLine}`);
+          if (displayLine) {
+            readableStream.write(displayLine + "\n");
+            combinedReadableStream.write(`${prefix} ${displayLine}\n`);
+            console.log(`${prefix} ${displayLine}`);
+          }
         }
       }
     }
@@ -83,6 +119,9 @@ for (const agent of agents) {
     for (const line of data.toString().split("\n")) {
       if (!line) continue;
       debugStream.write(`[stderr] ${line}\n`);
+      readableStream.write(`[stderr] ${line}\n`);
+      combinedDebugStream.write(`[stderr] ${prefix} ${line}\n`);
+      combinedReadableStream.write(`${prefix} [stderr] ${line}\n`);
       console.log(`${prefix} ${line}`);
     }
   });
@@ -98,7 +137,7 @@ function shutdown() {
   for (const proc of logProcesses) {
     proc.kill();
   }
-  for (const [, stream] of debugStreams) {
+  for (const stream of logStreams) {
     stream.end();
   }
   for (const agent of agents) {
@@ -126,3 +165,4 @@ function handleSignal() {
 
 process.on("SIGINT", handleSignal);
 process.on("SIGTERM", handleSignal);
+})();

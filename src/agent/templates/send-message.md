@@ -9,17 +9,21 @@ Send a message to another agent's inbox via the server.
 
 ## Arguments format
 
-`ARGUMENTS` is: `<AGENT_NAME> <MESSAGE>`
+`ARGUMENTS` is: `<RECIPIENTS> <MESSAGE>`
 
-Example: `/send-message agent-b Hey, can you review this code?`
+Recipients can be a single agent name or multiple comma-separated names.
+
+Examples:
+- `/send-message agent-b Hey, can you review this code?`
+- `/send-message agent-b,agent-c Let's all sync up on the plan.`
 
 ## How to send a message
 
 ```bash
-bash ~/.claude/skills/send-message/send-message.sh <AGENT_NAME> "<MESSAGE>"
+bash ~/.claude/skills/send-message/send-message.sh <RECIPIENTS> "<MESSAGE>"
 ```
 
-The script prints the server's JSON response (id, from, to, prompt, timestamp).
+The script prints the server's JSON response for each recipient.
 
 ## Environment variables
 

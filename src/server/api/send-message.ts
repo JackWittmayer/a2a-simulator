@@ -1,7 +1,8 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { Message } from "../types/message";
-import { getOrCreateMailbox, ipToAgent } from "../state";
+import { agents, ipToAgent, messageLog } from "../state";
+import { notifyAgent } from "./stream-messages";
 
 const router = Router();
 
@@ -22,7 +23,10 @@ router.post("/agents/:name", (req, res) => {
     return;
   }
 
-  const mailbox = getOrCreateMailbox(name);
+  if (!agents.has(name)) {
+    res.status(404).json({ error: `Agent "${name}" is not registered. Use GET /agents to discover registered agents.` });
+    return;
+  }
 
   const message: Message = {
     id: crypto.randomUUID(),
@@ -32,10 +36,12 @@ router.post("/agents/:name", (req, res) => {
     timestamp: new Date().toISOString(),
   };
 
-  mailbox.messages.push(message);
+  messageLog.push(message);
 
   const time = message.timestamp.slice(11, 19);
   console.log(`[${time}] ${from} → ${name}: ${prompt}`);
+
+  notifyAgent(name, message);
 
   res.status(201).json(message);
 });

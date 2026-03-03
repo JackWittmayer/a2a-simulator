@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SERVER_URL="${SERVER_URL:-http://localhost:3000}"
-NAME="$1"
+STATUS="$1"
 
-curl -s -X POST "$SERVER_URL/register" \
+curl -s -X PUT "$SERVER_URL/status" \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"$NAME\"}"
+  -d "{\"status\": \"$STATUS\"}"
