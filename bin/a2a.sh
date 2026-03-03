@@ -20,6 +20,7 @@ usage() {
   echo ""
   echo "Options for start:"
   echo "  --runs <N>                 Run N copies of the simulation in parallel (default: 1)"
+  echo "  --orchestrate              Run with an AI orchestrator that watches, tweaks, and restarts"
   echo ""
   echo "Options for generate:"
   echo "  -o, --output <file.yaml>   Output file path (default: examples/generated-<timestamp>.yaml)"
@@ -28,6 +29,8 @@ usage() {
   echo "Examples:"
   echo "  a2a start examples/secret-language.yaml"
   echo "  a2a start examples/secret-language.yaml --runs 3"
+  echo "  a2a start examples/secret-language.yaml --orchestrate"
+  echo "  a2a start --orchestrate \"Two agents debate philosophy\""
   echo "  a2a generate \"Three agents debate whether AI should have rights\""
   echo "  a2a generate \"Two chefs compete to create recipes\" --run"
   echo "  a2a stop"
@@ -45,12 +48,30 @@ build() {
 
 cmd_start() {
   if [ $# -eq 0 ]; then
-    echo "Error: provide a simulation YAML file"
-    echo "Usage: a2a start <simulation.yaml>"
+    echo "Error: provide a simulation YAML file or --orchestrate with a seed prompt"
+    echo "Usage: a2a start <simulation.yaml> [--orchestrate]"
+    echo "       a2a start --orchestrate \"<seed-prompt>\""
     exit 1
   fi
+
+  # Check for --orchestrate flag
+  local orchestrate=false
+  local pass_args=()
+  for arg in "$@"; do
+    if [ "$arg" = "--orchestrate" ]; then
+      orchestrate=true
+    else
+      pass_args+=("$arg")
+    fi
+  done
+
   build
-  node dist/src/start.js "$@"
+
+  if [ "$orchestrate" = true ]; then
+    node dist/src/orchestrate.js "${pass_args[@]}"
+  else
+    node dist/src/start.js "$@"
+  fi
 }
 
 cmd_generate() {
