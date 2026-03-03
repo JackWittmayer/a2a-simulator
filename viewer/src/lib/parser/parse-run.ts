@@ -105,12 +105,28 @@ export function scanRuns(logsDir: string): RunSummary[] {
 		}
 
 		// Nested structure: logs/<sim-name>/<timestamp>/*.debug.log
+		// or three levels deep: logs/<sim-name>/<timestamp>/run-N/*.debug.log
 		const subEntries = fs.readdirSync(dirPath, { withFileTypes: true });
 		for (const sub of subEntries) {
 			if (!sub.isDirectory()) continue;
 			const subPath = path.join(dirPath, sub.name);
-			const summary = extractRunSummary(subPath, `${entry.name}/${sub.name}`);
-			if (summary) runs.push(summary);
+			if (hasLogFiles(subPath)) {
+				const summary = extractRunSummary(subPath, `${entry.name}/${sub.name}`);
+				if (summary) runs.push(summary);
+			}
+
+			// Check one more level for multi-run: <timestamp>/run-N/
+			try {
+				const subSubEntries = fs.readdirSync(subPath, { withFileTypes: true });
+				for (const subSub of subSubEntries) {
+					if (!subSub.isDirectory()) continue;
+					const subSubPath = path.join(subPath, subSub.name);
+					const summary = extractRunSummary(subSubPath, `${entry.name}/${sub.name}/${subSub.name}`);
+					if (summary) runs.push(summary);
+				}
+			} catch {
+				// skip if not readable
+			}
 		}
 	}
 

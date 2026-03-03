@@ -1,17 +1,31 @@
+import { Response } from "express";
 import { Mailbox } from "./types/mailbox";
 import { Message } from "./types/message";
 
-export const agents = new Map<string, Mailbox>();
-export const ipToAgent = new Map<string, string>();
-export const messageLog: Message[] = [];
-export const cursors = new Map<string, number>();
+export interface ServerState {
+  agents: Map<string, Mailbox>;
+  ipToAgent: Map<string, string>;
+  messageLog: Message[];
+  cursors: Map<string, number>;
+  sseClients: Map<string, Response>;
+}
 
-export function getOrCreateMailbox(name: string): Mailbox {
-  let mailbox = agents.get(name);
+export function createState(): ServerState {
+  return {
+    agents: new Map(),
+    ipToAgent: new Map(),
+    messageLog: [],
+    cursors: new Map(),
+    sseClients: new Map(),
+  };
+}
+
+export function getOrCreateMailbox(state: ServerState, name: string): Mailbox {
+  let mailbox = state.agents.get(name);
   if (!mailbox) {
     mailbox = { name, status: "idle", statusUpdatedAt: new Date().toISOString() };
-    agents.set(name, mailbox);
-    cursors.set(name, 0);
+    state.agents.set(name, mailbox);
+    state.cursors.set(name, 0);
   }
   return mailbox;
 }

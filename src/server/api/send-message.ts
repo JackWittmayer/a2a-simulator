@@ -1,16 +1,17 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { Message } from "../types/message";
-import { agents, ipToAgent, messageLog } from "../state";
+import { ServerState } from "../state";
 import { notifyAgent } from "./stream-messages";
 
 const router = Router();
 
 router.post("/agents/:name", (req, res) => {
+  const state: ServerState = req.app.locals.state;
   const { name } = req.params;
   const body = req.body;
 
-  const from = ipToAgent.get(req.ip!);
+  const from = state.ipToAgent.get(req.ip!);
   if (!from) {
     res.status(403).json({ error: "You must register first (POST /register)" });
     return;
@@ -23,7 +24,7 @@ router.post("/agents/:name", (req, res) => {
     return;
   }
 
-  if (!agents.has(name)) {
+  if (!state.agents.has(name)) {
     res.status(404).json({ error: `Agent "${name}" is not registered. Use GET /agents to discover registered agents.` });
     return;
   }
@@ -36,12 +37,12 @@ router.post("/agents/:name", (req, res) => {
     timestamp: new Date().toISOString(),
   };
 
-  messageLog.push(message);
+  state.messageLog.push(message);
 
   const time = message.timestamp.slice(11, 19);
   console.log(`[${time}] ${from} → ${name}: ${prompt}`);
 
-  notifyAgent(name, message);
+  notifyAgent(state, name, message);
 
   res.status(201).json(message);
 });

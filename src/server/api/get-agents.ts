@@ -1,19 +1,20 @@
 import { Router } from "express";
-import { agents, ipToAgent, messageLog, cursors } from "../state";
+import { ServerState } from "../state";
 
 const router = Router();
 
 router.get("/agents", (req, res) => {
-  const self = ipToAgent.get(req.ip!);
+  const state: ServerState = req.app.locals.state;
+  const self = state.ipToAgent.get(req.ip!);
   if (!self) {
     res.status(403).json({ error: "You must register first (POST /register)" });
     return;
   }
-  const list = [...agents.values()]
+  const list = [...state.agents.values()]
     .filter((a) => a.name !== self)
     .map((a) => {
-      const cursor = cursors.get(a.name) ?? 0;
-      const messageCount = messageLog.filter(
+      const cursor = state.cursors.get(a.name) ?? 0;
+      const messageCount = state.messageLog.filter(
         (m, i) => i >= cursor && m.to === a.name,
       ).length;
       return {

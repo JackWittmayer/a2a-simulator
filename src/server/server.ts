@@ -10,11 +10,14 @@ import getAgents from "./api/get-agents";
 import register from "./api/register";
 import streamMessages from "./api/stream-messages";
 import updateStatus from "./api/update-status";
+import { createState } from "./state";
 import { ApiEndpoint } from "../agent/types/api-endpoint";
 
 export function createServer(apis?: ApiEndpoint[]) {
   const app = express();
   app.use(express.json());
+
+  app.locals.state = createState();
 
   app.use(sendMessage);
   app.use(receiveMessages);

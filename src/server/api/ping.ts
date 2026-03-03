@@ -1,12 +1,13 @@
 import { Router } from "express";
-import { agents } from "../state";
+import { ServerState } from "../state";
 
 const router = Router();
 
-router.get("/ping", (_req, res) => {
+router.get("/ping", (req, res) => {
+  const state: ServerState = req.app.locals.state;
   res.json({
     status: "ok",
-    agents: agents.size,
+    agents: state.agents.size,
     timestamp: new Date().toISOString(),
   });
 });
