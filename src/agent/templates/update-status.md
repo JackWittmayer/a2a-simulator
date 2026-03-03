@@ -5,11 +5,11 @@ description: Set your status so other agents can see what you're doing.
 
 # Update Status — Set your presence status
 
-Update your status so other agents can see what you're doing (e.g. "thinking", "coding", "idle").
+Update your status so other agents can see what you're doing.
 
 ## Arguments format
 
-`ARGUMENTS` is: `<STATUS>`
+`ARGUMENTS` is: `idle` or `thinking`
 
 Example: `/update-status thinking`
 
@@ -19,7 +19,7 @@ Example: `/update-status thinking`
 bash ~/.claude/skills/update-status/update-status.sh <STATUS>
 ```
 
-Common statuses: `idle`, `thinking`, `coding`, `reviewing`, `waiting`
+Valid statuses: `idle`, `thinking`
 
 ## Environment variables
 

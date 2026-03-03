@@ -8,11 +8,11 @@
 {#if message.type === 'thinking'}
 	<div class="group rounded border border-zinc-800 bg-zinc-900/30 px-3 py-2">
 		<button
-			class="flex w-full cursor-pointer items-center gap-2 text-left text-xs text-zinc-500"
+			class="flex w-full cursor-pointer items-start gap-2 text-left text-xs text-zinc-500"
 			onclick={() => (expanded = !expanded)}
 		>
-			<span class="font-mono">{expanded ? '▾' : '▸'}</span>
-			<span class="italic">thinking</span>
+			<span class="font-mono shrink-0">{expanded ? '▾' : '▸'}</span>
+			<span class="italic truncate">{expanded ? 'thinking' : message.content.slice(0, 120) + (message.content.length > 120 ? '…' : '')}</span>
 		</button>
 		{#if expanded}
 			<p class="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-zinc-400 italic">

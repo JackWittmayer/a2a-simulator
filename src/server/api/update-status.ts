@@ -10,8 +10,9 @@ router.put("/status", (req, res) => {
     return;
   }
   const { status } = req.body;
-  if (!status || typeof status !== "string") {
-    res.status(400).json({ error: "status is required" });
+  const validStatuses = ["idle", "thinking"];
+  if (!validStatuses.includes(status)) {
+    res.status(400).json({ error: `status must be one of: ${validStatuses.join(", ")}` });
     return;
   }
   const mailbox = getOrCreateMailbox(name);
