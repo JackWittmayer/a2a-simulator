@@ -26,11 +26,8 @@ export function buildAgent(
     );
   }
 
-  const serverPort = config.server?.port ?? 3000;
-  const serverUrl = `http://host.docker.internal:${serverPort}`;
-
   const systemPrompt =
-    `YOUR VERY FIRST ACTION must be: export SERVER_URL=${serverUrl} && then run /start-listener in the background (run_in_background=true). Do this BEFORE anything else — do not think about your task first.` +
+    `YOUR VERY FIRST ACTION must be: run /start-listener in the background (run_in_background=true). Do this BEFORE anything else — do not think about your task first. The SERVER_URL environment variable is already set.` +
     "\n\nUse /check-inbox to read new messages. Use /send-message to reply. Use /get-agents to see who's available." +
     "\n\nUse /update-status before and after doing work (e.g. 'thinking', 'coding', 'idle')." +
     "\n\nAfter every action, run /check-inbox to see if new messages have arrived. NEVER stop working — keep checking your inbox and responding." +
@@ -49,6 +46,7 @@ export function buildAgent(
   // Inject --system-prompt and --no-session-persistence after "claude"
   const entrypoint = [
     baseEntrypoint[0],
+    "--model", model.name,
     "--system-prompt", systemPrompt,
     "--disallowedTools", "AskUserQuestion,EnterPlanMode",
     ...baseEntrypoint.slice(1),

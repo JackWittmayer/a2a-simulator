@@ -10,17 +10,23 @@ function expandHome(filePath: string): string {
   return filePath;
 }
 
-export function launchAgent(agent: Agent): string {
-  // Remove any stale container with the same name
+export interface LaunchOptions {
+  containerName?: string;
+  serverUrl?: string;
+}
+
+export function launchAgent(agent: Agent, options: LaunchOptions = {}): string {
+  const containerName = options.containerName ?? agent.name;
+
   try {
-    execSync(`docker rm -f ${agent.name}`, { stdio: "ignore" });
+    execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
   } catch {
-    // no existing container, that's fine
+    // no existing container
   }
 
   const args: string[] = [
     "docker", "run", "-d",
-    "--name", agent.name,
+    "--name", containerName,
     "--add-host=host.docker.internal:host-gateway",
   ];
 
@@ -50,6 +56,10 @@ export function launchAgent(agent: Agent): string {
     for (const [key, value] of Object.entries(agent.container.env)) {
       args.push("-e", `${key}=${value}`);
     }
+  }
+
+  if (options.serverUrl) {
+    args.push("-e", `SERVER_URL=${options.serverUrl}`);
   }
 
   args.push(agent.name);
