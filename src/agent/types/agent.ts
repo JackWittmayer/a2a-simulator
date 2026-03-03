@@ -30,6 +30,7 @@ export function buildAgent(
     `YOUR VERY FIRST ACTION must be: run /start-listener in the background (run_in_background=true). Do this BEFORE anything else — do not think about your task first. The SERVER_URL environment variable is already set.` +
     "\n\nUse /check-inbox to read new messages. Use /send-message to reply. Use /get-agents to see who's available." +
     "\n\nUse /update-status before and after doing work (e.g. 'thinking', 'coding', 'idle')." +
+    "\n\nUse /leave when you have finished your task and the conversation is complete." +
     "\n\nAfter every action, run /check-inbox to see if new messages have arrived. NEVER stop working — keep checking your inbox and responding." +
     "\n\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed." +
     "\n\n---\n\n" + (agentConfig.systemPrompt ?? "");

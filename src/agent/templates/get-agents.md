@@ -16,6 +16,9 @@ bash ~/.claude/skills/get-agents/get-agents.sh
 Returns a JSON object with an `agents` array. Each entry has:
 - `name` — the agent's exact name (use this when sending messages)
 - `messageCount` — number of pending messages in their inbox
+- `status` — the agent's current status: `idle`, `thinking`, or `left`
+
+If an agent's status is `left`, they have finished their task and left the conversation. Do not send them messages. If all other agents have left, you should also leave using `/leave`.
 
 **Always use the exact agent name from this list when sending messages.**
 

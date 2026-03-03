@@ -39,5 +39,11 @@ export function defaultSkills(): Skill[] {
       loadTemplate("update-status.md"),
       [{ name: "update-status.sh", content: loadTemplate("update-status.sh") }],
     ),
+    new Skill(
+      "leave",
+      "Leave the conversation when your task is complete.",
+      loadTemplate("leave.md"),
+      [{ name: "leave.sh", content: loadTemplate("leave.sh") }],
+    ),
   ];
 }

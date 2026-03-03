@@ -19,8 +19,12 @@ Examples:
 
 ## How to send a message
 
+Use a single-quoted heredoc to avoid shell interpolation of special characters like `$`:
+
 ```bash
-bash ~/.claude/skills/send-message/send-message.sh <RECIPIENTS> "<MESSAGE>"
+bash ~/.claude/skills/send-message/send-message.sh <RECIPIENTS> <<'EOF'
+<MESSAGE>
+EOF
 ```
 
 The script prints the server's JSON response for each recipient.

@@ -4,7 +4,12 @@ set -euo pipefail
 SERVER_URL="${SERVER_URL:-http://localhost:3000}"
 TO="$1"
 shift
-MESSAGE="$*"
+
+if [ $# -gt 0 ]; then
+  MESSAGE="$*"
+else
+  MESSAGE=$(cat)
+fi
 
 BODY=$(jq -n --arg prompt "$MESSAGE" '{prompt: $prompt}')
 
