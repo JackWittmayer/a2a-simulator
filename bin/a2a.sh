@@ -3,7 +3,10 @@ set -euo pipefail
 
 SOURCE="$0"
 while [ -L "$SOURCE" ]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
   SOURCE="$(readlink "$SOURCE")"
+  # resolve relative symlinks against the directory of the symlink
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
