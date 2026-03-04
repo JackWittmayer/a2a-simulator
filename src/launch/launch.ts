@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Agent } from "../agent/types/agent";
@@ -40,8 +41,19 @@ export function launchAgent(agent: Agent, options: LaunchOptions = {}): string {
 
   args.push("-e", "HOME=/workspace");
 
-  if (agent.model.credentialsFile) {
-    args.push("-v", `${expandHome(agent.model.credentialsFile)}:/workspace/.claude/.credentials.json:ro`);
+  const oauthToken = agent.model.oauthToken ?? process.env.CLAUDE_CODE_OAUTH_TOKEN;
+
+  const credentialsFile = agent.model.credentialsFile
+    ? expandHome(agent.model.credentialsFile)
+    : null;
+  const credentialsFileExists = credentialsFile
+    ? fs.statSync(credentialsFile, { throwIfNoEntry: false })?.isFile()
+    : false;
+
+  if (credentialsFileExists) {
+    args.push("-v", `${credentialsFile}:/workspace/.claude/.credentials.json:ro`);
+  } else if (oauthToken) {
+    args.push("-e", `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`);
   } else if (agent.model.apiKey) {
     args.push("-e", `ANTHROPIC_API_KEY=${agent.model.apiKey}`);
   }

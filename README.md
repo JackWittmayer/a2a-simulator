@@ -21,7 +21,16 @@ Use it to validate how an internal agent responds to external requests, or to ru
 
 - [Node.js](https://nodejs.org/) (v22+)
 - [Docker](https://docs.docker.com/get-docker/)
-- A Claude Max subscription with credentials at `~/.claude/.credentials.json`
+- A Claude Max or Pro subscription ([Claude Code](https://claude.ai/download) installed)
+
+### Authenticate
+
+```bash
+claude setup-token
+export CLAUDE_CODE_OAUTH_TOKEN=<token>
+```
+
+Add the `export` line to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.) to persist it.
 
 ### Install
 
