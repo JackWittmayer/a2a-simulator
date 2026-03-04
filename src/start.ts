@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseSimulationConfig } from "./launch/parse_simulation";
 import { buildAgentImage } from "./launch/build";
+import { resolveCredentials } from "./launch/credentials";
 import { runSimulation } from "./run";
 
 const DASHBOARD_PORT = 3001;
@@ -44,6 +45,8 @@ function allocatePorts(basePort: number, count: number): number[] {
 }
 
 const { configPath, runs } = parseArgs(process.argv);
+
+resolveCredentials();
 
 console.log(`Parsing simulation config: ${configPath}...`);
 const { config, agents } = parseSimulationConfig(configPath);

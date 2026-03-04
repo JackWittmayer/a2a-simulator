@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolveCredentials } from "./launch/credentials.js";
 import { TabbedView } from "./ui/tabbed-view.js";
 import { LogTailer } from "./ui/log-tailer.js";
 
@@ -211,6 +212,8 @@ async function main() {
   for (let i = 0; i < args.length; i++) {
     input = args[i];
   }
+
+  resolveCredentials();
 
   const options: OrchestratorOptions = {};
   if (input.endsWith(".yaml") || input.endsWith(".yml")) {
