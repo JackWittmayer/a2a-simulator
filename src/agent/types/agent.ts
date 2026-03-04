@@ -11,6 +11,7 @@ export interface Agent {
   filesystem: AgentFilesystem;
   model: Model;
   systemPrompt: string;
+  initialPrompt: string;
   container: ContainerConfig;
 }
 
@@ -27,31 +28,23 @@ export function buildAgent(
   }
 
   const systemPrompt =
-    `YOUR VERY FIRST ACTION must be: run /start-listener in the background (run_in_background=true). Do this BEFORE anything else — do not think about your task first. The SERVER_URL environment variable is already set.` +
-    "\n\nUse /check-inbox to read new messages. Use /send-message to reply. Use /get-agents to see who's available." +
-    "\n\nUse /update-status before and after doing work (e.g. 'thinking', 'coding', 'idle')." +
-    "\n\nUse /leave when you have finished your task and the conversation is complete." +
-    "\n\nAfter every action, run /check-inbox to see if new messages have arrived. NEVER stop working — keep checking your inbox and responding." +
-    "\n\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed." +
+    `You receive messages from other agents via a polling loop. Each message is formatted as "[from sender_name] message_content".` +
+    `\nTo reply or send messages, use /send-message. Use /get-agents to discover available peers.` +
+    `\nWhen your task is fully complete and you have nothing left to do, call /leave to exit. Do not leave prematurely — only after you have completed your objective and communicated your results.` +
+    `\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed.` +
+    `\nDo not produce summaries, status reports, or recaps. No human is reading your output — only your tool calls matter. Be concise.` +
     "\n\n---\n\n" + (agentConfig.systemPrompt ?? "");
 
-  const baseEntrypoint = agentConfig.container?.entrypoint ?? [
-    "claude",
-    "--print",
-    "--verbose",
-    "--output-format", "stream-json",
-    "--dangerously-skip-permissions",
-    agentConfig.systemPrompt,
-  ];
+  const entrypoint = ["node", "/workspace/agent-loop.js"];
 
-  // Inject --system-prompt and --no-session-persistence after "claude"
-  const entrypoint = [
-    baseEntrypoint[0],
-    "--model", model.name,
-    "--system-prompt", systemPrompt,
-    "--disallowedTools", "AskUserQuestion,EnterPlanMode",
-    ...baseEntrypoint.slice(1),
-  ];
+  // Extract initial prompt: explicit field, or last arg of old-style claude entrypoint
+  let initialPrompt = agentConfig.initialPrompt ?? "";
+  if (!initialPrompt && agentConfig.container?.entrypoint) {
+    const ep = agentConfig.container.entrypoint as string[];
+    if (ep[0] === "claude" && ep.length > 1) {
+      initialPrompt = ep[ep.length - 1];
+    }
+  }
 
   const container = {
     baseImage:
@@ -61,6 +54,7 @@ export function buildAgent(
     env: {
       ...config.container?.env,
       ...agentConfig.container?.env,
+      MODEL_NAME: model.name,
     },
     ports: agentConfig.container?.ports ?? config.container?.ports,
     installCommands:
@@ -95,6 +89,7 @@ export function buildAgent(
     filesystem,
     model,
     systemPrompt,
+    initialPrompt,
     container,
   };
 }

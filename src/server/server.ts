@@ -10,6 +10,7 @@ import getAgents from "./api/get-agents";
 import register from "./api/register";
 import streamMessages from "./api/stream-messages";
 import updateStatus from "./api/update-status";
+import ackMessage from "./api/ack-message";
 import { createState } from "./state";
 import { ApiEndpoint } from "../agent/types/api-endpoint";
 
@@ -26,6 +27,7 @@ export function createServer(apis?: ApiEndpoint[]) {
   app.use(getAgents);
   app.use(register);
   app.use(updateStatus);
+  app.use(ackMessage);
 
   if (apis) {
     const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "a2a-state-"));

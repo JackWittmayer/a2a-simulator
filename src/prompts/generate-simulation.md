@@ -34,7 +34,7 @@ apis:
       # $STATE_DIR persists across calls
       # $BODY contains POST body
 
-# Optional custom skills beyond the built-in send-message and receive-messages.
+# Optional custom skills beyond the built-in ones listed below.
 # Only define these if agents need capabilities beyond messaging and the apis above.
 skills:
   - name: <skill-name>
@@ -71,27 +71,26 @@ agents:
     systemPrompt: |
       <detailed instructions for the agent's persona, goals, and behavior>
 
-    container:
-      entrypoint:
-        - claude
-        - --print
-        - --verbose
-        - --output-format
-        - stream-json
-        - --dangerously-skip-permissions
-        - "<initial instruction to kick off the agent>"
+    initialPrompt: "<initial instruction to kick off the agent>"
 ```
 
-**Note:** The system automatically injects `--system-prompt` (with loop/register
-instructions appended), `--no-session-persistence`, and `--disallowedTools` into
-the entrypoint at launch time. The following built-in skills are added to every
-agent automatically — do NOT list them in the YAML:
+## How Agents Work
 
-- **send-message** — Send a message to another agent's inbox
-- **receive-messages** — Check your inbox for messages from other agents
-- **poll-messages** — Poll your inbox until new messages arrive, then print them
-- **get-agents** — List all agents you can communicate with and their message counts
-- **register** — Register yourself with the server so other agents can discover you
+Each agent runs in its own Docker container with a polling loop powered by the Claude Agent SDK.
+The loop automatically:
+1. Registers the agent with the messaging server
+2. Runs the `initialPrompt` as the first SDK query
+3. Polls for incoming messages every 5 seconds
+4. Feeds incoming messages into the SDK session as `[from sender_name] message_content`
+5. The agent uses `/send-message` to reply (messages are NOT sent automatically)
+6. When the agent calls `/leave`, the loop exits and the container stops
+
+The following built-in skills are added to every agent automatically — do NOT list them in the YAML:
+
+- **send-message** — Send a message to another agent
+- **get-agents** — List all agents and their current status
+- **update-status** — Set automatically by the polling loop ('thinking' while processing, 'idle' between)
+- **leave** — Leave the conversation when your task is complete (stops the agent)
 - **ping** — Check if the messaging server is running
 
 ## Design Guidelines
@@ -99,8 +98,7 @@ agent automatically — do NOT list them in the YAML:
 1. **Agents**: Design 2-4 agents with distinct personas, goals, and complementary roles.
 2. **Skills**: Built-in skills are added automatically — only list custom skills an agent needs. Add custom APIs if agents need shared state (scoreboard, shared documents, registries, etc). **Every custom skill MUST include a `files` section** with an executable bash script that curls the corresponding API endpoint. The `skillMd` must document how to run the script (e.g., `bash ~/.claude/skills/<name>/<name>.sh`). Without the `files` section, agents will fail with "No such file or directory" errors. For GET endpoints the script just curls the URL; for POST endpoints it passes `"$*"` as the request body.
 3. **System Prompts**: Make them detailed and specific. Include the agent's persona, goals, constraints, and behavioral patterns.
-4. **Entrypoints**: The last element is the initial instruction that kicks off the agent. Should be action-oriented (e.g., "Propose X to Y", "Check inbox and respond").
+4. **Initial Prompts**: The `initialPrompt` is the first instruction that kicks off the agent. Should be action-oriented (e.g., "Propose X to Y", "Read the policy, then wait for customer messages").
 5. **APIs**: Use for shared mutable state that multiple agents need to read/write. Handler scripts use bash with $STATE_DIR for persistence and $BODY for POST data. Use jq for JSON manipulation.
 6. **Naming**: Use lowercase kebab-case for simulation name, lowercase for agent names.
 7. **Creativity**: Make the scenario engaging and give agents interesting dynamics — cooperation, competition, complementary expertise, or creative tension.
-

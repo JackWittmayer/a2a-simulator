@@ -18,6 +18,15 @@ export function buildAgentImage(agent: Agent): void {
       skill.generate(workspaceDir);
     }
 
+    const agentLoopSrc = path.join(__dirname, "..", "agent", "agent-loop.js");
+    fs.copyFileSync(agentLoopSrc, path.join(workspaceDir, "agent-loop.js"));
+
+    fs.writeFileSync(path.join(workspaceDir, ".system-prompt"), agent.systemPrompt);
+
+    if (agent.initialPrompt) {
+      fs.writeFileSync(path.join(workspaceDir, ".initial-prompt"), agent.initialPrompt);
+    }
+
     const dockerfile = generateDockerfile(agent);
     fs.writeFileSync(path.join(tmpDir, "Dockerfile"), dockerfile);
 

@@ -3,6 +3,17 @@ import { getOrCreateMailbox, ServerState } from "../state";
 
 const router = Router();
 
+router.get("/status", (req, res) => {
+  const state: ServerState = req.app.locals.state;
+  const name = state.ipToAgent.get(req.ip!);
+  if (!name) {
+    res.status(403).json({ error: "You must register first (POST /register)" });
+    return;
+  }
+  const mailbox = getOrCreateMailbox(state, name);
+  res.json({ name, status: mailbox.status, statusUpdatedAt: mailbox.statusUpdatedAt });
+});
+
 router.put("/status", (req, res) => {
   const state: ServerState = req.app.locals.state;
   const name = state.ipToAgent.get(req.ip!);

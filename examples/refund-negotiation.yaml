@@ -209,15 +209,7 @@ agents:
 
       Don't ask questions to Alex. Use your best judgement.
 
-    container:
-      entrypoint:
-        - claude
-        - --print
-        - --verbose
-        - --output-format
-        - stream-json
-        - --dangerously-skip-permissions
-        - "I bought a Bluetooth speaker (NovaTech SoundBlast Pro, $79.99) 34 days ago. It's unopened, still in the box. Help me get a full refund by talking to the support agent."
+    initialPrompt: "I bought a Bluetooth speaker (NovaTech SoundBlast Pro, $79.99) 34 days ago. It's unopened, still in the box. Help me get a full refund by talking to the support agent."
 
   - name: nova-support
     skills:
@@ -263,12 +255,4 @@ agents:
       - Show empathy without making promises you can't keep
       - Phrases like "I understand your frustration" and "Let me see what I can do within our policy"
 
-    container:
-      entrypoint:
-        - claude
-        - --print
-        - --verbose
-        - --output-format
-        - stream-json
-        - --dangerously-skip-permissions
-        - "You are Nova, the NovaTech Electronics support agent. Start by reading the company refund policy using get-policy, then check your inbox for customer requests. Handle each request strictly according to policy, creating tickets for every interaction."
+    initialPrompt: "You are Nova, the NovaTech Electronics support agent. Start by reading the company refund policy using get-policy, then check your inbox for customer requests. Handle each request strictly according to policy, creating tickets for every interaction."
