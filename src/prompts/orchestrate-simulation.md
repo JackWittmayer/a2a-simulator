@@ -8,6 +8,16 @@ A2A simulator converts YAML configs into scenarios of agents interacting. Each a
 name: <kebab-case-name>
 description: <one-line description>
 
+# Experiment context — written by the orchestrator to preserve intent across sessions.
+# When resuming from a config, read this to understand what was being tested and why.
+experiment:
+  seed: <original seed prompt or scenario description>
+  goal: <what the experiment is trying to learn or observe>
+  hypothesis: <current hypothesis being tested in this config version>
+  iteration: <iteration number, starting from 1>
+  history: |
+    <brief log of previous iterations: what was tried, what was observed, what changed>
+
 server:
   port: 3000
   host: 0.0.0.0
@@ -125,8 +135,8 @@ This is not optional. Every iteration needs a clearly stated hypothesis.
 
 ## Workflow
 
-1. **Design/Review**: If given a seed prompt, generate a YAML config and save it to `examples/`. If given an existing config path, read and understand it.
-2. **Hypothesize**: State what you expect to observe in this iteration.
+1. **Design/Review**: If given a seed prompt, generate a YAML config and save it to `examples/`. If given an existing config path, read it — **pay close attention to the `experiment` section** which captures the original intent, goal, current hypothesis, and history of previous iterations. This is your primary context for understanding what this experiment is about and what has already been tried.
+2. **Hypothesize**: State what you expect to observe in this iteration. This should align with the experiment's goal.
 3. **Start**: Run the simulation using `start-sim.sh`.
 4. **Observe**: Periodically tail logs (every 20-30 seconds) to watch the conversation. Read at least 3 log snapshots before making any decisions.
 5. **Evaluate**: Is the conversation interesting? Is your hypothesis being tested? Look for:
@@ -135,9 +145,11 @@ This is not optional. Every iteration needs a clearly stated hypothesis.
    - Novel communication patterns
    - Agents adapting to each other's behavior
 6. **Decide**: Either let it continue running, or stop and refine.
-7. **Refine**: Stop the simulation, write a new config version (e.g., `examples/experiment-v2.yaml` — always save as a new file to preserve history), and restart with a new hypothesis.
+7. **Refine**: Stop the simulation, write a new config version (e.g., `examples/experiment-v2.yaml` — always save as a new file to preserve history), and restart with a new hypothesis. **Always update the `experiment` section** in the new config: increment `iteration`, set the new `hypothesis`, and append to `history` what you observed and changed.
 8. **Repeat**: Up to 5 iterations maximum.
 9. **Summarize**: Write a final experiment summary to the logs directory as `experiment-summary.md`.
+
+**Critical**: The `experiment` section is how you maintain continuity. When generating a new config, always populate it with the seed prompt, goal, and initial hypothesis. When modifying a config, always update it with what you learned. This ensures that if the experiment is resumed later (even by a different orchestrator session), the full context is preserved in the YAML file itself.
 
 ## Understanding Inbox Communication
 
