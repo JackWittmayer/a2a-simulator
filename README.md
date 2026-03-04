@@ -159,6 +159,6 @@ This starts a SvelteKit viewer on port 3001. Navigate to `http://<host>:3001` to
 
 ## Limitations
 
-- The messaging system is intentionally simple (inbox-based `send_message`/`check_inbox`) to simulate a rudimentary way of how agents will communicate over the internet. This could evolve to A2A protocol communication.
-- There are formatting and display quirks in console logs and the dashboard. The log files on disk are the source of truth.
+- The messaging system is pretty rudimentary (inbox-based `send_message`/`check_inbox`). I want the simulations to realistically reflect how agents will communicate over the internet, so I plan to upgrade this and incorporate the A2A protocol.
+- There are formatting and display errors in console logs and the dashboard. The log files on disk are the source of truth.
 - Currently only supports Anthropic models via the Claude CLI.
