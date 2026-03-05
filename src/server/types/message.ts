@@ -4,4 +4,6 @@ export interface Message {
   to: string;
   prompt: string;
   timestamp: string;
+  replyTo?: string;
+  replyToContent?: string;
 }

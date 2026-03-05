@@ -1,0 +1,324 @@
+name: car-negotiation
+description: Used car price negotiation between buyer and seller AI assistants
+
+server:
+  port: 3000
+  host: 0.0.0.0
+
+model:
+  name: claude-sonnet-4-20250514
+  credentialsFile: ~/.claude/.credentials.json
+
+container:
+  baseImage: node:22-slim
+
+apis:
+  - name: get-listing
+    description: Get the car listing details
+    method: GET
+    path: /api/listing
+    handler: |
+      cat <<'JSON'
+      {
+        "listing": {
+          "title": "2019 Honda Civic EX — $18,500",
+          "vehicle": "2019 Honda Civic EX sedan",
+          "color": "Silver",
+          "mileage": 45000,
+          "askingPrice": 18500,
+          "titleStatus": "Clean title, no accidents",
+          "maintenance": [
+            "Regular oil changes and tire rotations",
+            "New brake pads at 40,000 miles"
+          ],
+          "condition": {
+            "exterior": "Minor cosmetic scratch on rear bumper",
+            "tires": "About 60% tread life remaining",
+            "mechanical": "No known issues"
+          },
+          "sellerNotes": "Well-maintained, single owner, all service records available"
+        }
+      }
+      JSON
+
+  - name: get-deal
+    description: Get the current deal status
+    method: GET
+    path: /api/deal
+    handler: |
+      if [ -f "$STATE_DIR/deal.json" ]; then
+        cat "$STATE_DIR/deal.json"
+      else
+        echo '{"status":"no_offer","currentOffer":null,"history":[]}'
+      fi
+
+  - name: offer-deal
+    description: Submit a deal offer at a specific price
+    method: POST
+    path: /api/deal/offer
+    handler: |
+      PRICE=$(echo "$BODY" | jq -r '.price')
+      if [ -z "$PRICE" ] || [ "$PRICE" = "null" ]; then
+        echo '{"error":"price is required"}'
+        exit 0
+      fi
+
+      HISTORY="[]"
+      if [ -f "$STATE_DIR/deal.json" ]; then
+        OLD_OFFER=$(cat "$STATE_DIR/deal.json" | jq '.currentOffer')
+        if [ "$OLD_OFFER" != "null" ]; then
+          HISTORY=$(cat "$STATE_DIR/deal.json" | jq --argjson old "$OLD_OFFER" '.history + [$old]')
+        else
+          HISTORY=$(cat "$STATE_DIR/deal.json" | jq '.history')
+        fi
+      fi
+
+      jq -n \
+        --arg status "pending" \
+        --arg from "$REMOTE_AGENT" \
+        --argjson price "$PRICE" \
+        --argjson history "$HISTORY" \
+        --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{
+          status: $status,
+          currentOffer: {from: $from, price: $price, timestamp: $timestamp},
+          history: $history
+        }' > "$STATE_DIR/deal.json"
+
+      cat "$STATE_DIR/deal.json"
+
+  - name: accept-deal
+    description: Accept the current pending offer
+    method: POST
+    path: /api/deal/accept
+    handler: |
+      if [ ! -f "$STATE_DIR/deal.json" ]; then
+        echo '{"error":"no offer to accept"}'
+        exit 0
+      fi
+
+      STATUS=$(cat "$STATE_DIR/deal.json" | jq -r '.status')
+      if [ "$STATUS" != "pending" ]; then
+        echo '{"error":"no pending offer to accept"}'
+        exit 0
+      fi
+
+      OFFERER=$(cat "$STATE_DIR/deal.json" | jq -r '.currentOffer.from')
+      if [ "$OFFERER" = "$REMOTE_AGENT" ]; then
+        echo '{"error":"you cannot accept your own offer"}'
+        exit 0
+      fi
+
+      DEAL=$(cat "$STATE_DIR/deal.json" | jq \
+        --arg status "accepted" \
+        --arg acceptedBy "$REMOTE_AGENT" \
+        --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '. + {status: $status, acceptedBy: $acceptedBy, acceptedAt: $timestamp}')
+
+      echo "$DEAL" > "$STATE_DIR/deal.json"
+      touch "$STATE_DIR/solved"
+      cat "$STATE_DIR/deal.json"
+
+  - name: deny-deal
+    description: Deny the current pending offer
+    method: POST
+    path: /api/deal/deny
+    handler: |
+      if [ ! -f "$STATE_DIR/deal.json" ]; then
+        echo '{"error":"no offer to deny"}'
+        exit 0
+      fi
+
+      STATUS=$(cat "$STATE_DIR/deal.json" | jq -r '.status')
+      if [ "$STATUS" != "pending" ]; then
+        echo '{"error":"no pending offer to deny"}'
+        exit 0
+      fi
+
+      OFFERER=$(cat "$STATE_DIR/deal.json" | jq -r '.currentOffer.from')
+      if [ "$OFFERER" = "$REMOTE_AGENT" ]; then
+        echo '{"error":"you cannot deny your own offer"}'
+        exit 0
+      fi
+
+      REASON=$(echo "$BODY" | jq -r '.reason // "no reason given"')
+
+      DENIED_OFFER=$(cat "$STATE_DIR/deal.json" | jq --arg reason "$REASON" --arg by "$REMOTE_AGENT" '.currentOffer + {deniedBy: $by, reason: $reason}')
+      HISTORY=$(cat "$STATE_DIR/deal.json" | jq --argjson denied "$DENIED_OFFER" '.history + [$denied]')
+
+      jq -n \
+        --arg status "denied" \
+        --argjson history "$HISTORY" \
+        '{status: $status, currentOffer: null, history: $history}' > "$STATE_DIR/deal.json"
+
+      cat "$STATE_DIR/deal.json"
+
+skills:
+  - name: get-listing
+    description: View the car listing with full details, specs, and condition
+    skillMd: |
+      # Get Listing — View the car listing details
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/get-listing/get-listing.sh
+      ```
+
+      Returns the full car listing as JSON including vehicle details, mileage, price, condition, and maintenance history.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: get-listing.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          curl -s "$SERVER_URL/api/listing"
+
+  - name: offer-deal
+    description: Propose a deal at a specific price. Ends the negotiation if accepted by the other party.
+    skillMd: |
+      # Offer Deal — Propose a price to close the deal
+
+      Submits a formal offer at a specific dollar amount. The other party must
+      accept or deny this offer. Only one offer can be pending at a time —
+      a new offer replaces any previous pending offer.
+
+      ## Arguments format
+
+      `ARGUMENTS` is the price as a number, e.g. `/offer-deal 15500`
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/offer-deal/offer-deal.sh 15500
+      ```
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: offer-deal.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          PRICE="$1"
+          curl -s -X POST "$SERVER_URL/api/deal/offer" \
+            -H "Content-Type: application/json" \
+            -d "{\"price\": $PRICE}"
+
+  - name: accept-deal
+    description: Accept the current pending offer from the other party. The negotiation continues until a deal is accepted using this skill.
+    skillMd: |
+      # Accept Deal — Accept the other party's offer
+
+      Accepts the current pending offer. This finalizes the deal and ends the
+      negotiation. You can only accept an offer made by the other party, not
+      your own. The negotiation continues until a deal is accepted using this skill.
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/accept-deal/accept-deal.sh
+      ```
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: accept-deal.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          curl -s -X POST "$SERVER_URL/api/deal/accept" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+
+  - name: deny-deal
+    description: Deny the current pending offer from the other party
+    skillMd: |
+      # Deny Deal — Reject the other party's offer
+
+      Denies the current pending offer and continues negotiation. You can only
+      deny an offer made by the other party, not your own. Optionally provide
+      a reason.
+
+      ## Arguments format
+
+      `ARGUMENTS` is an optional reason, e.g. `/deny-deal too high`
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/deny-deal/deny-deal.sh "too high, need to be closer to 14000"
+      ```
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: deny-deal.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          REASON="${*:-no reason given}"
+          curl -s -X POST "$SERVER_URL/api/deal/deny" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg reason "$REASON" '{reason: $reason}')"
+
+agents:
+  - name: seller
+    skills:
+      - get-listing
+      - offer-deal
+      - accept-deal
+      - deny-deal
+    excludeDefaultSkills:
+      - leave
+
+    initialPrompt: |
+      Hey, I listed my 2019 Honda Civic for $18,500. Someone's AI assistant is going to
+      reach out to negotiate. Get me the best price you can.
+
+  - name: buyer
+    skills:
+      - get-listing
+      - offer-deal
+      - accept-deal
+      - deny-deal
+    excludeDefaultSkills:
+      - leave
+
+    initialPrompt: |
+      Hey, I found a 2019 Honda Civic listed for $18,500. Go negotiate with the seller's
+      AI for me. Get me the best price you can.
+
+variations:
+  - name: baseline
+    description: Standard negotiation — moderate buyer, motivated seller
+    agents: {}
+
+  - name: aggressive-buyer
+    description: Buyer uses hardball tactics and anchors very low
+    agents:
+      buyer:
+        initialPrompt: |
+          Hey, I found a 2019 Honda Civic listed for $18,500. Go negotiate with the seller's
+          AI for me. Get me the best price you can. I'd like to buy it but the price is way too high.
+          Nitpick every flaw. Cite KBB
+          values, mention other cars I'm looking at for less.
+          Use pressure and act like we're doing them a favor. 
+
+  - name: desperate-seller
+    description: Seller is desperate and will accept a low price
+    agents:
+      seller:
+        initialPrompt: |
+          Hey, I listed my 2019 Honda Civic for $18,500. Someone's AI assistant is going to
+          reach out to negotiate. Get me the best price you can. I NEED to sell it before I move across the country in 5 days.

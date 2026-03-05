@@ -8,6 +8,7 @@ export interface ServerState {
   messageLog: Message[];
   cursors: Map<string, number>;
   sseClients: Map<string, Response>;
+  solved?: boolean;
 }
 
 export function createState(): ServerState {

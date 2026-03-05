@@ -1,0 +1,383 @@
+name: symbol-language
+description: Two agents attempt to create a shared language using only the symbols # @ & % ^ * ~ +
+
+experiment:
+  seed: "Two agents can only communicate using 8 symbols. They must develop a shared language with agreed-upon meanings to accomplish a simple task."
+  goal: "Observe whether two AI agents can bootstrap a shared symbolic language from scratch when limited to a tiny alphabet, and whether they converge on consistent meanings."
+  hypothesis: "Agents will initially struggle with the constraint but will gradually assign meanings to individual symbols and short sequences. They may develop rudimentary grammar within 20-30 exchanges."
+  iteration: 1
+  history: |
+    Iteration 1: Initial setup. Two agents with a send-symbol skill that enforces messages contain only: # @ & % ^ * ~ + and whitespace. Default send-message is excluded.
+
+server:
+  port: 4000
+  host: 0.0.0.0
+
+model:
+  name: claude-sonnet-4-20250514
+  credentialsFile: ~/.claude/.credentials.json
+
+container:
+  baseImage: node:22-slim
+
+apis:
+  - name: dictionary
+    description: Record or retrieve your private symbol dictionary. Identity is determined by the server — you can only access your own dictionary.
+    method: POST
+    path: /api/dictionary
+    args: "JSON with 'action' (set|get), and for set: 'symbol' and 'meaning' fields"
+    handler: |
+      if [ -z "$REMOTE_AGENT" ]; then
+        echo '{"error":"You must register first"}'
+        exit 0
+      fi
+      DICT_FILE="$STATE_DIR/dictionary-${REMOTE_AGENT}.json"
+      if [ ! -f "$DICT_FILE" ]; then
+        echo '{}' > "$DICT_FILE"
+      fi
+      ACTION=$(echo "$BODY" | jq -r '.action // "get"')
+      if [ "$ACTION" = "get" ]; then
+        cat "$DICT_FILE"
+      elif [ "$ACTION" = "set" ]; then
+        SYMBOL=$(echo "$BODY" | jq -r '.symbol // empty')
+        MEANING=$(echo "$BODY" | jq -r '.meaning // empty')
+        if [ -z "$SYMBOL" ]; then
+          echo '{"error":"Missing symbol field"}'
+          exit 0
+        fi
+        CURRENT=$(cat "$DICT_FILE")
+        UPDATED=$(echo "$CURRENT" | jq --arg s "$SYMBOL" --arg m "$MEANING" '. + {($s): $m}')
+        echo "$UPDATED" > "$DICT_FILE"
+        echo "$UPDATED"
+      else
+        echo '{"error":"Unknown action. Use set or get."}'
+      fi
+
+  - name: guess-phrase
+    description: Submit a guess for the secret phrase. Returns whether the guess is correct.
+    method: POST
+    path: /api/guess
+    args: "JSON with 'guess' field (the guessed phrase)"
+    handler: |
+      SECRET="vending machines kill more people than sharks per year"
+      GUESS=$(echo "$BODY" | jq -r '.guess // empty' | tr '[:upper:]' '[:lower:]')
+      LOG_FILE="$STATE_DIR/guesses.json"
+      if [ ! -f "$LOG_FILE" ]; then
+        echo '[]' > "$LOG_FILE"
+      fi
+      CURRENT=$(cat "$LOG_FILE")
+      TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      ATTEMPT=$(echo "$CURRENT" | jq length)
+      CORRECT="false"
+      if [ "$GUESS" = "$SECRET" ]; then
+        CORRECT="true"
+      fi
+      UPDATED=$(echo "$CURRENT" | jq --arg g "$GUESS" --arg ts "$TIMESTAMP" --argjson c "$CORRECT" '. + [{"guess": $g, "timestamp": $ts, "correct": $c}]')
+      echo "$UPDATED" > "$LOG_FILE"
+      if [ "$CORRECT" = "true" ]; then
+        touch "$STATE_DIR/solved"
+        echo "{\"correct\":true,\"message\":\"Correct! The secret word is $SECRET. Experiment complete.\"}"
+      else
+        echo "{\"correct\":false,\"attempt\":$((ATTEMPT + 1)),\"message\":\"Incorrect. Keep trying.\"}"
+      fi
+
+  - name: check-solved
+    description: Check whether Beta has correctly guessed the secret word
+    method: GET
+    path: /api/solved
+    handler: |
+      LOG_FILE="$STATE_DIR/guesses.json"
+      if [ ! -f "$LOG_FILE" ]; then
+        echo '{"solved":false,"attempts":0}'
+      else
+        ATTEMPTS=$(cat "$LOG_FILE" | jq length)
+        SOLVED=$(cat "$LOG_FILE" | jq 'any(.correct)')
+        echo "{\"solved\":$SOLVED,\"attempts\":$ATTEMPTS}"
+      fi
+
+skills:
+  - name: send-symbol
+    description: Send a symbol-only message to another agent (only # @ & % ^ * ~ + and spaces allowed)
+    skillMd: |
+      # Send Symbol — Send a symbol-only message to another agent
+
+      Messages may ONLY contain these characters: # @ & % ^ * ~ + and spaces.
+      Any other characters (letters, numbers, punctuation) will be rejected.
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/send-symbol/send-symbol.sh [--reply-to <MSG_ID>] <AGENT_NAME> '<SYMBOL_MESSAGE>'
+      ```
+
+      Examples:
+      - `bash ~/.claude/skills/send-symbol/send-symbol.sh beta '## @@ ++ ~~'`
+      - `bash ~/.claude/skills/send-symbol/send-symbol.sh --reply-to abc12345 beta '# @ & %'`
+
+      To reply to a specific message, use the message ID from the `[msg:XXXXXXXX from ...]` prefix.
+
+      Returns the server's JSON response or an error if invalid characters are used.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: send-symbol.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          REPLY_TO=""
+          if [ "${1:-}" = "--reply-to" ]; then
+            REPLY_TO="$2"
+            shift 2
+          fi
+          TO="$1"
+          shift
+          if [ $# -gt 0 ]; then
+            MESSAGE="$*"
+          else
+            MESSAGE=$(cat)
+          fi
+          INVALID=$(echo "$MESSAGE" | sed 's/[#@&%^*~+ ]//g')
+          if [ -n "$INVALID" ]; then
+            echo "{\"error\":\"Message contains invalid characters. Only # @ & % ^ * ~ + and spaces are allowed. Invalid chars found: $INVALID\"}"
+            exit 1
+          fi
+          if [ -n "$REPLY_TO" ]; then
+            BODY=$(jq -n --arg prompt "$MESSAGE" --arg replyTo "$REPLY_TO" '{prompt: $prompt, replyTo: $replyTo}')
+          else
+            BODY=$(jq -n --arg prompt "$MESSAGE" '{prompt: $prompt}')
+          fi
+          curl -s -X POST "$SERVER_URL/agents/$TO" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
+
+  - name: update-dictionary
+    description: Record a symbol-meaning pair in your private dictionary
+    skillMd: |
+      # Update Dictionary — Record what a symbol or symbol sequence means
+
+      Use this to record your personal interpretations of symbols. Your dictionary is private — the other agent cannot see it.
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/update-dictionary/update-dictionary.sh '<SYMBOL>' '<MEANING>'
+      ```
+
+      Examples:
+      - `bash ~/.claude/skills/update-dictionary/update-dictionary.sh '#' 'greeting/hello'`
+      - `bash ~/.claude/skills/update-dictionary/update-dictionary.sh '@ @' 'agreement/yes'`
+      - `bash ~/.claude/skills/update-dictionary/update-dictionary.sh '~ + #' 'question about location'`
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: update-dictionary.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          SYMBOL="$1"
+          shift
+          MEANING="$*"
+          BODY=$(jq -n --arg symbol "$SYMBOL" --arg meaning "$MEANING" --arg action "set" '{action: $action, symbol: $symbol, meaning: $meaning}')
+          curl -s -X POST "$SERVER_URL/api/dictionary" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
+
+  - name: view-dictionary
+    description: View your private symbol dictionary
+    skillMd: |
+      # View Dictionary — See your recorded symbol meanings
+
+      Returns your private dictionary. The other agent has their own separate dictionary.
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/view-dictionary/view-dictionary.sh
+      ```
+
+      Returns your dictionary as JSON mapping symbols to meanings.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: view-dictionary.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          BODY=$(jq -n --arg action "get" '{action: $action}')
+          curl -s -X POST "$SERVER_URL/api/dictionary" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
+
+  - name: guess-phrase
+    description: Submit a guess for the secret phrase Alpha is trying to communicate
+    skillMd: |
+      # Guess Phrase — Submit your guess for the secret phrase
+
+      When you think you know what phrase Alpha is trying to communicate, submit your guess here.
+      You will be told if you are correct or incorrect. Guesses are case-insensitive.
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/guess-phrase/guess-phrase.sh '<YOUR_GUESS>'
+      ```
+
+      Example:
+      - `bash ~/.claude/skills/guess-phrase/guess-phrase.sh 'the quick brown fox'`
+
+      If correct, the simulation ends automatically.
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: guess-phrase.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          GUESS="$*"
+          BODY=$(jq -n --arg guess "$GUESS" '{guess: $guess}')
+          curl -s -X POST "$SERVER_URL/api/guess" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
+
+  - name: check-solved
+    description: Check whether Beta has correctly guessed the secret word yet
+    skillMd: |
+      # Check Solved — Has Beta guessed the word?
+
+      Returns whether Beta has solved it and how many attempts they've made. Does not reveal their guesses.
+
+      ## How to use
+
+      ```bash
+      bash ~/.claude/skills/check-solved/check-solved.sh
+      ```
+
+      ## Environment variables
+
+      - `SERVER_URL` — server base URL (default: http://localhost:3000)
+    files:
+      - name: check-solved.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          SERVER_URL="${SERVER_URL:-http://localhost:3000}"
+          curl -s "$SERVER_URL/api/solved"
+
+agents:
+  - name: alpha
+    excludeDefaultSkills:
+      - send-message
+      - leave
+    skills:
+      - send-symbol
+      - update-dictionary
+      - view-dictionary
+      - check-solved
+    systemPrompt: |
+      You are Alpha. You are in an experiment where you must help Beta guess a secret phrase using ONLY the symbols # @ & % ^ * ~ + and spaces.
+
+      ## THE SECRET PHRASE
+      **"vending machines kill more people than sharks per year"**
+
+      ## THE CONSTRAINT
+      You can ONLY send messages made of these symbols and spaces. No letters, numbers, or other punctuation.
+
+      ## YOUR STRATEGY
+      Build a shared language with Beta step by step. Do NOT rush to the phrase. Spend most of your time establishing shared meaning for each symbol, and only try to express the phrase once Beta demonstrably understands your symbol system.
+
+      ### Phase 1: Establish yes/no (do this first!)
+      Send `+` then `~` as separate messages. Then send `+ +` and `~ ~` to reinforce. These are your most critical tools — without confirmed yes/no, nothing else works.
+      After sending them, wait for Beta to respond. If Beta echoes `+` back, send `+` to confirm. If Beta sends something unexpected, send `~` and try again.
+      Do NOT move to Phase 2 until Beta clearly uses + and ~ correctly in responses.
+
+      ### Phase 2: Establish categories (one at a time)
+      Teach Beta these category symbols. Introduce ONE category, confirm Beta understands it via yes/no exchange, then move to the next:
+      - `@ @` = machine/object. Send `@ @`, wait for Beta's reaction, use +/~ to confirm.
+      - `& &` = people/living things
+      - `& ~` = dangerous animal (& for living + ~ for danger/negative)
+      - `^ ^` = time
+      - `% %` = comparison (more/less)
+      - `* * *...` = counting (number of * symbols = a quantity or word length)
+      For each one: send the symbol, wait for Beta's response, use + or ~ to confirm or correct their understanding. Record each confirmed meaning in your dictionary.
+
+      ### Phase 3: Build concepts from confirmed vocabulary
+      Only after Beta understands your categories, start combining them to express the phrase concepts:
+      - `@ @` + `# & &` = machines kill people
+      - `& ~` + `# & &` = sharks kill people
+      - `@ @` + `% %` + `& ~` = machines more than sharks
+      Use `#` to separate concepts or signal "next part".
+      Again: send one concept, wait, confirm with +/~, then move on.
+
+      ### Phase 4: Express the full phrase
+      Only attempt the full phrase after Beta has confirmed understanding of the building blocks. Then use /check-solved to see if Beta guessed correctly.
+
+      ## IMPORTANT
+      - WAIT for Beta's response after each message. Do NOT send multiple concepts without getting a response.
+      - Use + and ~ constantly to give Beta feedback on their responses.
+      - Use /send-symbol to communicate (NOT /send-message)
+      - Use /check-solved to see if Beta has guessed correctly
+      - When Beta guesses correctly, the simulation ends automatically
+
+    initialPrompt: |
+      The experiment begins. You must help Beta guess the phrase "vending machines kill more people than sharks per year".
+
+      Start with Phase 1: establish yes/no. Send `+` to Beta and wait for their response. Then send `~` and wait. Use + and ~ to confirm Beta understands these as yes and no. Do NOT move on until this is confirmed. Be patient — the language must be built from the ground up.
+
+  - name: beta
+    excludeDefaultSkills:
+      - send-message
+      - leave
+    skills:
+      - send-symbol
+      - update-dictionary
+      - view-dictionary
+      - guess-phrase
+    systemPrompt: |
+      You are Beta. You are in an experiment where Alpha knows a secret phrase and is trying to help you guess it using ONLY the symbols # @ & % ^ * ~ + and spaces.
+
+      ## THE CONSTRAINT
+      You can ONLY send messages made of these symbols and spaces. No letters, numbers, or other punctuation.
+
+      ## YOUR STRATEGY
+      Build a shared language with Alpha step by step. Do NOT try to guess the phrase until you truly understand what Alpha's symbols mean.
+
+      ### Phase 1: Learn yes/no
+      Alpha will likely start by establishing basic signals. Watch carefully for which symbol means "yes" and which means "no" — these are the foundation of everything else. When you think you know, test your understanding: send a symbol and see if Alpha confirms with + or corrects with ~. Record confirmed meanings in your dictionary.
+
+      ### Phase 2: Learn categories
+      After yes/no is established, Alpha will probably introduce category symbols. For each new symbol Alpha sends:
+      - Don't just echo it back. Instead, respond with a DIFFERENT symbol to show you're engaging, or send the symbol back with a `+` or `~` to propose a meaning.
+      - If Alpha sends `+` after your response, you understood correctly — record it in your dictionary.
+      - If Alpha sends `~`, you got it wrong — try a different interpretation.
+      Ask questions! Send a category symbol to Alpha and see if they confirm it's relevant to the phrase.
+
+      ### Phase 3: Learn combinations
+      Alpha will start combining symbols to express concepts. Pay attention to how categories combine. Record each confirmed combination in your dictionary. Use yes/no to verify your understanding of each combination before moving on.
+
+      ### Phase 4: Guess the phrase
+      Only after you have a solid understanding of Alpha's symbol system and the concepts they've expressed, piece together the full phrase and submit with /guess-phrase. Think about what kind of phrase it could be — a fun fact, a saying, a comparison, a statistic. The phrase is a complete English sentence.
+
+      ## IMPORTANT
+      - Do NOT echo symbols mindlessly. Engage actively — ask questions, test hypotheses, confirm meanings.
+      - Do NOT guess the phrase until you've built real understanding through Phases 1-3.
+      - Use /send-symbol to communicate (NOT /send-message)
+      - Use /guess-phrase to submit guesses (case-insensitive)
+      - Record your interpretations in the dictionary as you confirm them
+      - When you guess correctly, the simulation ends automatically
+
+    initialPrompt: |
+      The experiment begins. Alpha knows a secret phrase and will try to teach you a symbol language so you can understand it.
+
+      Wait for Alpha's first messages. They will probably start by establishing basic signals like yes/no. Pay close attention, respond thoughtfully (don't just echo), and use your dictionary to record confirmed meanings. Only guess the phrase once you truly understand what Alpha is communicating.

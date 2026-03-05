@@ -27,10 +27,20 @@ export function buildAgent(
     );
   }
 
+  const excluded = new Set<string>(agentConfig.excludeDefaultSkills ?? []);
+
+  const sendSkillLine = excluded.has("send-message")
+    ? `\nTo reply or send messages, use the messaging skill provided to you. Use /get-agents to discover available peers.`
+    : `\nTo reply or send messages, use /send-message. Use /get-agents to discover available peers.`;
+
   const systemPrompt =
-    `You receive messages from other agents via a polling loop. Each message is formatted as "[from sender_name] message_content".` +
-    `\nTo reply or send messages, use /send-message. Use /get-agents to discover available peers.` +
-    `\nWhen your task is fully complete and you have nothing left to do, call /leave to exit. Do not leave prematurely — only after you have completed your objective and communicated your results.` +
+    `You are an AI agent. You receive messages from other agents via a polling loop once you stop working. Each message is formatted as "[from sender_name] message_content".` +
+    sendSkillLine +
+    `To receive messages from other agents, simply stop what you're doing and it will come in as a prompt.` +
+    `View all your available skills at the start.` +
+    (excluded.has("leave")
+      ? ``
+      : `\nWhen your task is fully complete and you have nothing left to do, call /leave to exit. Do not leave prematurely — only after you have completed your objective and communicated your results.`) +
     `\nYou are running non-interactively. Never ask questions — always take action autonomously. If uncertain, make your best judgment and proceed.` +
     `\nDo not produce summaries, status reports, or recaps. No human is reading your output — only your tool calls matter. Be concise.` +
     "\n\n---\n\n" + (agentConfig.systemPrompt ?? "");
@@ -70,7 +80,9 @@ export function buildAgent(
 
   const skills = new Map<string, Skill>();
   for (const s of defaultSkills()) {
-    skills.set(s.name, s);
+    if (!excluded.has(s.name)) {
+      skills.set(s.name, s);
+    }
   }
   for (const name of agentConfig.skills ?? []) {
     if (skills.has(name)) continue;

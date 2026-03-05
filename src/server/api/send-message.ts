@@ -29,12 +29,22 @@ router.post("/agents/:name", (req, res) => {
     return;
   }
 
+  const replyTo: string | undefined = body.replyTo;
+  let replyToContent: string | undefined;
+  if (replyTo) {
+    const orig = state.messageLog.find((m) => m.id === replyTo || m.id.startsWith(replyTo));
+    if (orig) {
+      replyToContent = orig.prompt.length > 80 ? orig.prompt.slice(0, 80) + "..." : orig.prompt;
+    }
+  }
+
   const message: Message = {
     id: crypto.randomUUID(),
     from,
     to: name,
     prompt,
     timestamp: new Date().toISOString(),
+    ...(replyTo ? { replyTo, replyToContent } : {}),
   };
 
   state.messageLog.push(message);

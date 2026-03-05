@@ -16,6 +16,12 @@ export function defaultSkills(): Skill[] {
       [{ name: "get-agents.sh", content: loadTemplate("get-agents.sh") }],
     ),
     new Skill(
+      "get-info",
+      "Get your agent configuration including system prompt, initial prompt, and environment info.",
+      loadTemplate("get-info.md"),
+      [{ name: "get-info.sh", content: loadTemplate("get-info.sh") }],
+    ),
+    new Skill(
       "ping",
       "Check if the messaging server is running.",
       loadTemplate("ping.md"),

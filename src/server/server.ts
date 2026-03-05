@@ -31,6 +31,7 @@ export function createServer(apis?: ApiEndpoint[]) {
 
   if (apis) {
     const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "a2a-state-"));
+    app.locals.stateDir = stateDir;
     registerCustomApis(app, apis, stateDir);
   }
 
@@ -47,9 +48,14 @@ function registerCustomApis(
 
     app[method](api.path, (req, res) => {
       try {
+        const state: import("./state").ServerState = req.app.locals.state;
+        const remoteAgent = state.ipToAgent.get(req.ip!) ?? "";
+
         const env: Record<string, string> = {
           ...process.env as Record<string, string>,
           STATE_DIR: stateDir,
+          REMOTE_AGENT: remoteAgent,
+          REMOTE_ADDR: req.ip ?? "",
         };
 
         // Pass query args or body to the handler
@@ -65,6 +71,16 @@ function registerCustomApis(
           timeout: 10000,
           encoding: "utf-8",
         });
+
+        // Check if handler wrote a solved marker
+        if (fs.existsSync(path.join(stateDir, "solved"))) {
+          const state2: import("./state").ServerState = req.app.locals.state;
+          state2.solved = true;
+          for (const mailbox of state2.agents.values()) {
+            mailbox.status = "left";
+            mailbox.statusUpdatedAt = new Date().toISOString();
+          }
+        }
 
         // Try to parse as JSON, fall back to plain text
         try {

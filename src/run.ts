@@ -15,18 +15,26 @@ export interface RunOptions {
   apis?: ApiEndpoint[];
   simName: string;
   multiRun: boolean;
+  runLabel?: string;
+  imagePrefix?: string;
+}
+
+export interface SimulationHandle {
+  shutdown: () => void;
+  done: Promise<void>;
 }
 
 export async function runSimulation(
   agents: Agent[],
   options: RunOptions,
-): Promise<() => void> {
+): Promise<SimulationHandle> {
   const { port, host, runIndex, logsDir, apis, simName, multiRun } = options;
-  const runLabel = multiRun ? `run-${runIndex}` : "";
+  const runLabel = options.runLabel ?? (multiRun ? `run-${runIndex}` : "");
   const containerSuffix = multiRun ? `-run-${runIndex}` : "";
   const serverUrl = `http://host.docker.internal:${port}`;
 
-  const runLogsDir = multiRun ? path.join(logsDir, `run-${runIndex}`) : logsDir;
+  const logSubdir = options.runLabel ?? `run-${runIndex}`;
+  const runLogsDir = multiRun ? path.join(logsDir, logSubdir) : logsDir;
   fs.mkdirSync(runLogsDir, { recursive: true });
 
   const app = createServer(apis);
@@ -64,8 +72,11 @@ export async function runSimulation(
     const containerName = `${agent.name}${containerSuffix}`;
     containerNames.push(containerName);
 
+    const imageName = options.imagePrefix
+      ? `${agent.name}-${options.imagePrefix}`
+      : undefined;
     console.log(`Launching ${containerName}...`);
-    const containerId = launchAgent(agent, { containerName, serverUrl });
+    const containerId = launchAgent(agent, { containerName, serverUrl, imageName });
     console.log(`  ${containerName} running (${containerId.slice(0, 12)})`);
 
     const debugStream = fs.createWriteStream(
@@ -129,7 +140,50 @@ export async function runSimulation(
     logProcesses.push(logProc);
   }
 
-  return function shutdown() {
+  const state = app.locals.state as import("./server/state").ServerState;
+  const AGENT_POLL_INTERVAL = 3000;
+
+  const done = new Promise<void>((resolve) => {
+    const check = setInterval(() => {
+      if (state.agents.size < agents.length) return;
+      for (const mailbox of state.agents.values()) {
+        if (mailbox.status !== "left") return;
+      }
+      clearInterval(check);
+      console.log("All agents have left — simulation complete.");
+
+      // Save simulation outcome from server state directory
+      const stateDir = app.locals.stateDir as string | undefined;
+      if (stateDir) {
+        const outcome: Record<string, any> = {};
+        try {
+          const files = fs.readdirSync(stateDir).filter((f) => f.endsWith(".json"));
+          for (const file of files) {
+            const key = file.replace(/\.json$/, "");
+            const content = fs.readFileSync(path.join(stateDir, file), "utf-8");
+            try {
+              outcome[key] = JSON.parse(content);
+            } catch {
+              outcome[key] = content;
+            }
+          }
+        } catch {}
+
+        if (Object.keys(outcome).length > 0) {
+          fs.writeFileSync(
+            path.join(runLogsDir, "outcome.json"),
+            JSON.stringify(outcome, null, 2) + "\n",
+          );
+          const label = runLabel ? ` (${runLabel})` : "";
+          console.log(`  Outcome saved${label}: ${path.join(runLogsDir, "outcome.json")}`);
+        }
+      }
+
+      resolve();
+    }, AGENT_POLL_INTERVAL);
+  });
+
+  function shutdown() {
     for (const proc of logProcesses) {
       proc.kill();
     }
@@ -144,5 +198,7 @@ export async function runSimulation(
       }
     }
     server.close();
-  };
+  }
+
+  return { shutdown, done };
 }

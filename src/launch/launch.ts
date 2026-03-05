@@ -14,6 +14,7 @@ function expandHome(filePath: string): string {
 export interface LaunchOptions {
   containerName?: string;
   serverUrl?: string;
+  imageName?: string;
 }
 
 export function launchAgent(agent: Agent, options: LaunchOptions = {}): string {
@@ -74,7 +75,7 @@ export function launchAgent(agent: Agent, options: LaunchOptions = {}): string {
     args.push("-e", `SERVER_URL=${options.serverUrl}`);
   }
 
-  args.push(agent.name);
+  args.push(options.imageName ?? agent.name);
 
   const containerId = execSync(args.join(" "), { encoding: "utf-8" }).trim();
   return containerId;

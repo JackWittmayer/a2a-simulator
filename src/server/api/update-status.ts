@@ -28,6 +28,10 @@ router.put("/status", (req, res) => {
     return;
   }
   const mailbox = getOrCreateMailbox(state, name);
+  if (state.solved && status !== "left") {
+    res.json({ name, status: mailbox.status, statusUpdatedAt: mailbox.statusUpdatedAt });
+    return;
+  }
   mailbox.status = status;
   mailbox.statusUpdatedAt = new Date().toISOString();
   res.json({ name, status, statusUpdatedAt: mailbox.statusUpdatedAt });

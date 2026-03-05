@@ -3,6 +3,18 @@ import { ApiEndpoint } from "./api-endpoint";
 import { Agent } from "./agent";
 import { Skill } from "./skill";
 
+export interface Variation {
+  name: string;
+  description?: string;
+  agents?: Record<string, {
+    systemPrompt?: string;
+    initialPrompt?: string;
+  }>;
+  apis?: Record<string, {
+    handler?: string;
+  }>;
+}
+
 export interface SimulationConfig {
   name: string;
   description?: string;
@@ -20,4 +32,5 @@ export interface SimulationConfig {
   apis?: ApiEndpoint[];
   skills?: Skill[];
   agents: Agent[];
+  variations?: Variation[];
 }

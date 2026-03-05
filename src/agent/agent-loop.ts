@@ -19,6 +19,8 @@ interface ServerMessage {
   to: string;
   prompt: string;
   timestamp: string;
+  replyTo?: string;
+  replyToContent?: string;
 }
 
 function log(msg: string) {
@@ -73,19 +75,6 @@ async function ackMessage(messageId: string) {
   });
 }
 
-function groupBySender(messages: ServerMessage[]): Map<string, ServerMessage[]> {
-  const groups = new Map<string, ServerMessage[]>();
-  for (const msg of messages) {
-    const existing = groups.get(msg.from);
-    if (existing) {
-      existing.push(msg);
-    } else {
-      groups.set(msg.from, [msg]);
-    }
-  }
-  return groups;
-}
-
 async function runQuery(
   queryFn: (opts: { prompt: string; options?: Record<string, unknown> }) => AsyncGenerator<{ session_id?: string; type: string; subtype?: string; result?: string }, void>,
   userMessage: string,
@@ -123,12 +112,15 @@ async function main() {
 
   let sessionId: string | undefined;
   let processing = false;
+  let lastActivityTime = Date.now();
+  const IDLE_NUDGE_MS = 30_000;
 
   if (INITIAL_PROMPT) {
     log(`Running initial prompt: ${INITIAL_PROMPT}`);
     await updateStatus("thinking");
     sessionId = await runQuery(query, INITIAL_PROMPT, sessionId);
     await updateStatus("idle");
+    lastActivityTime = Date.now();
     if (await checkIfLeft()) {
       log("Left after initial prompt");
       process.exit(0);
@@ -141,35 +133,60 @@ async function main() {
 
     try {
       const messages = await pollMessages();
-      if (messages.length === 0) return;
 
-      const grouped = groupBySender(messages);
-
-      for (const [sender, senderMessages] of grouped) {
-        const combined = senderMessages
-          .map((m) => m.prompt)
-          .join("\n\n");
-
-        log(`${senderMessages.length} message(s) from ${sender}: ${combined}`);
-
-        await updateStatus("thinking");
-        sessionId = await runQuery(
-          query,
-          `[from ${sender}] ${combined}`,
-          sessionId,
-        );
-
-        await updateStatus("idle");
-
-        for (const msg of senderMessages) {
-          await ackMessage(msg.id);
+      if (messages.length === 0) {
+        if (sessionId && Date.now() - lastActivityTime >= IDLE_NUDGE_MS) {
+          if (await checkIfLeft()) {
+            log("Already left, skipping nudge");
+            clearInterval(interval);
+            process.exit(0);
+          }
+          log("Idle nudge triggered");
+          await updateStatus("thinking");
+          sessionId = await runQuery(
+            query,
+            "[system] You have been idle for 30 seconds with no new messages. Continue working toward your objective. If you are waiting on other agents, send them a message to follow up. Review your available skills to properly close or leave the conversation if needed.",
+            sessionId,
+          );
+          lastActivityTime = Date.now();
+          if (await checkIfLeft()) {
+            log("Left conversation");
+            clearInterval(interval);
+            process.exit(0);
+          }
+          await updateStatus("idle");
         }
+        return;
+      }
 
-        if (await checkIfLeft()) {
-          log("Left conversation");
-          clearInterval(interval);
-          process.exit(0);
-        }
+      const combined = messages
+        .map((m) => {
+          let replyCtx = "";
+          if (m.replyTo) {
+            const key = m.replyTo.slice(0, 8);
+            replyCtx = m.replyToContent
+              ? ` (replying to msg:${key} "${m.replyToContent}")`
+              : ` (replying to msg:${key})`;
+          }
+          return `[msg:${m.id.slice(0, 8)} from ${m.from}${replyCtx}] ${m.prompt}`;
+        })
+        .join("\n\n");
+
+      log(`${messages.length} message(s): ${combined}`);
+
+      await updateStatus("thinking");
+      sessionId = await runQuery(query, combined, sessionId);
+      await updateStatus("idle");
+      lastActivityTime = Date.now();
+
+      for (const msg of messages) {
+        await ackMessage(msg.id);
+      }
+
+      if (await checkIfLeft()) {
+        log("Left conversation");
+        clearInterval(interval);
+        process.exit(0);
       }
     } catch (err) {
       log(`Error: ${err instanceof Error ? err.message : String(err)}`);
